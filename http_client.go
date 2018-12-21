@@ -372,11 +372,9 @@ func (ehc *HttpClient) Post() (HttpResponse, error) {
 	if ehc.buf.Len() <= 0 {
 		writer = ehc.procWriter()
 	}
-	//sodaClient.Do()这个方法会把请求的body给干没
 	//此处传一个临时的buf进去，保留原始的buf信息
 	tmpBuf := bytes.Buffer{}
 	tmpBuf.Write(ehc.buf.Bytes())
-	//注意，如果要用go-http原生的库，此处传进去的tmpBuf经过sodaClient.Do()处理后就没了
 	httpReq, err := http.NewRequest("POST", ehc.url, &tmpBuf)
 	if err != nil {
 		LogErrorf("_HttpClient_Post_error||%v||err=%v||http.NewRequest failed", ehc.getComErrMsg(), err)
@@ -387,7 +385,7 @@ func (ehc *HttpClient) Post() (HttpResponse, error) {
 	if len(contentType) <= 0 && writer != nil {
 		ehc.SetContentType(writer.FormDataContentType())
 	}
-	//调用go-http的相关方法来处理
+	//处理
 	resp, err := ehc.do(httpReq)
 	if err != nil {
 		LogErrorf("_HttpClient_Post_failure||%v||err=%v", ehc.getComErrMsg(), err)
@@ -518,8 +516,7 @@ func (ehc *HttpClient) processResponse(response *http.Response, err error) (Http
 	return ret, nil
 }
 
-//执行请求操作，源自杜欢的 go-http 库！
-//主要的处理逻辑是从go-http里扒过来的方法，那个库依赖的东西太多了，而且有时候更新不会做向前兼容
+//执行请求操作
 func (ehc *HttpClient) do(httpReq *http.Request) (resp *http.Response, err error) {
 	ehc.traceId = FakeTraceId()
 	httpReq.URL, _ = url.Parse(ehc.url)
@@ -612,6 +609,7 @@ func (ehc *HttpClient) do(httpReq *http.Request) (resp *http.Response, err error
 				httpReq.Body = nextBody
 			}
 		}
+
 		httpReq.Header.Set("header-traceid", ehc.traceId)
 
 		//开始请求http接口
