@@ -7,7 +7,6 @@ package goUtils
 import (
 	"fmt"
 	"os"
-	"runtime"
 	"testing"
 )
 
@@ -18,9 +17,7 @@ var Testpoints = []GeoPoint{
 }
 
 func TestGeoHashEncode(t *testing.T) {
-	pc, _, _, _ := runtime.Caller(0)
-	f := runtime.FuncForPC(pc)
-	fmt.Printf("\n\n\n------------start %s------------\n", f.Name())
+	testStart()
 
 	for _, pInfo := range Testpoints {
 		fmt.Fprintf(os.Stdout, "Lat:%f\tLng:%f\n", pInfo.Lat, pInfo.Lng)
@@ -32,13 +29,11 @@ func TestGeoHashEncode(t *testing.T) {
 			fmt.Fprintf(os.Stdout, "\tprecision:%d\tdist:%-14s\n", i, dt)
 		}
 	}
-	fmt.Printf("------------end %s------------\n", f.Name())
+	testEnd()
 }
 
 func TestGeoHashDecode(t *testing.T) {
-	pc, _, _, _ := runtime.Caller(0)
-	f := runtime.FuncForPC(pc)
-	fmt.Printf("\n\n\n------------start %s------------\n", f.Name())
+	testStart()
 
 	//一坨的地理位置信息
 	points := []GeoPoint{
@@ -63,13 +58,11 @@ func TestGeoHashDecode(t *testing.T) {
 
 		}
 	}
-	fmt.Printf("------------end %s------------\n", f.Name())
+	testEnd()
 }
 
 func TestDiffLatLng(t *testing.T) {
-	pc, _, _, _ := runtime.Caller(0)
-	f := runtime.FuncForPC(pc)
-	fmt.Printf("\n\n\n------------start %s------------\n", f.Name())
+	testStart()
 
 	distance := 54392.02
 	fmt.Fprintf(os.Stdout, "distance=%v\n", distance)
@@ -80,13 +73,11 @@ func TestDiffLatLng(t *testing.T) {
 		dist := EarthDistance(p, point)
 		fmt.Fprintf(os.Stdout, "oriLat:%f\toriLng:%f\tdiff:%v\tdist:%f\tangle=%v\n", point.Lat, point.Lng, p, dist, ang)
 	}
-	fmt.Printf("------------end %s------------\n", f.Name())
+	testEnd()
 }
 
 func TestMidPoint(t *testing.T) {
-	pc, _, _, _ := runtime.Caller(0)
-	f := runtime.FuncForPC(pc)
-	fmt.Printf("\n\n\n------------start %s------------\n", f.Name())
+	testStart()
 	point := GeoPoint{Lat: 39.43373712, Lng: 120.378810983558}
 	for _, p := range Testpoints {
 		midPoint := MidPoint(point, p)
@@ -95,13 +86,11 @@ func TestMidPoint(t *testing.T) {
 		dist3 := EarthDistanceOld(p, midPoint)
 		fmt.Fprintf(os.Stdout, "allDist:%f\tdist1:%f\tdist2:%f\n", dist1, dist2, dist3)
 	}
-	fmt.Printf("------------end %s------------\n", f.Name())
+	testEnd()
 }
 
 func TestFormatDistance(t *testing.T) {
-	pc, _, _, _ := runtime.Caller(0)
-	f := runtime.FuncForPC(pc)
-	fmt.Printf("\n\n\n------------start %s------------\n", f.Name())
+	testStart()
 	str := []string{
 		"5000.00m",
 		"44.1km",
@@ -114,13 +103,11 @@ func TestFormatDistance(t *testing.T) {
 		ret := FormatDistance(s)
 		fmt.Fprintf(os.Stdout, "str:%s\tdist:%v\n", s, ret)
 	}
-	fmt.Printf("------------end %s------------\n", f.Name())
+	testEnd()
 }
 
 func TestGeoGridBox_InGridBox(t *testing.T) {
-	pc, _, _, _ := runtime.Caller(0)
-	f := runtime.FuncForPC(pc)
-	fmt.Printf("\n\n\n------------start %s------------\n", f.Name())
+	testStart()
 	box := GeoRectangle{
 		MaxLng: 120.378810983558,
 		MinLng: 120.309268963407,
@@ -134,14 +121,12 @@ func TestGeoGridBox_InGridBox(t *testing.T) {
 	fmt.Println(box.IsPointInRect(GeoPoint{Lat: 31.547996, Lng: 120.978810}))
 	fmt.Println(box.IsPointInRect(GeoPoint{Lat: 31.947996, Lng: 120.978810}))
 	fmt.Println(box.IsPointInRect(box.MidPoint()))
-	fmt.Printf("------------end %s------------\n", f.Name())
+	testEnd()
 }
 
 //点是否在多边形内
 func TestGeoPolygon_IsPointInPolygon(t *testing.T) {
-	pc, _, _, _ := runtime.Caller(0)
-	f := runtime.FuncForPC(pc)
-	fmt.Printf("\n\n\n------------start %s------------\n", f.Name())
+	testStart()
 	polygon := getSpecialPolygon4()
 	is10 := polygon.IsPointInPolygon(GeoPoint{Lat: 39.9957275390625, Lng: 116.3177490234375})
 	fmt.Println(is10)
@@ -158,7 +143,7 @@ func TestGeoPolygon_IsPointInPolygon(t *testing.T) {
 	fmt.Println(is2)
 	is3 := polygon.IsPointInPolygon(GeoPoint{Lat: 39.992368, Lng: 116.436464})
 	fmt.Println(is3)
-	fmt.Printf("------------end %s------------\n", f.Name())
+	testEnd()
 }
 
 type testLineIntersect struct {
@@ -179,9 +164,7 @@ func adfadfasdfasdfajlkjkhkjh(ps ...testLineIntersect) bool {
 }
 
 func TestGeoLine_IsIntersect(t *testing.T) {
-	pc, _, _, _ := runtime.Caller(0)
-	f := runtime.FuncForPC(pc)
-	fmt.Printf("\n\n\n------------start %s------------\n", f.Name())
+	testStart()
 	points := []testLineIntersect{
 		{name: "北大东门", point: GeoPoint{Lat: 39.998006, Lng: 116.322415}},
 		{name: "西郊线香山站", point: GeoPoint{Lat: 39.999899, Lng: 116.211025}},
@@ -213,13 +196,11 @@ func TestGeoLine_IsIntersect(t *testing.T) {
 		}
 	}
 
-	fmt.Printf("------------end %s------------\n", f.Name())
+	testEnd()
 }
 
 func TestGeoLine_GetIntersectPoint(t *testing.T) {
-	pc, _, _, _ := runtime.Caller(0)
-	f := runtime.FuncForPC(pc)
-	fmt.Printf("\n\n\n------------start %s------------\n", f.Name())
+	testStart()
 	p1 := GeoPoint{Lat: 39.998006, Lng: 116.322415}
 	p2 := GeoPoint{Lat: 39.851969, Lng: 116.434991}
 	p3 := GeoPoint{Lat: 40.004818, Lng: 116.474552}
@@ -236,13 +217,11 @@ func TestGeoLine_GetIntersectPoint(t *testing.T) {
 	line2 = MakeGeoLine(p3, p4)
 	a, p, b = line1.GetIntersectPoint(line2)
 	fmt.Println(a, p, b)
-	fmt.Printf("------------end %s------------\n", f.Name())
+	testEnd()
 }
 
 func TestGeoLine_IsContainPoint(t *testing.T) {
-	pc, _, _, _ := runtime.Caller(0)
-	f := runtime.FuncForPC(pc)
-	fmt.Printf("\n\n\n------------start %s------------\n", f.Name())
+	testStart()
 	basePoint := GeoPoint{Lat: 39.983855, Lng: 116.27635}
 	p1 := PointAtDistAndAngle(basePoint, 3000, 88)
 	p2 := PointAtDistAndAngle(basePoint, 9000, 88)
@@ -251,21 +230,22 @@ func TestGeoLine_IsContainPoint(t *testing.T) {
 	fmt.Println(line.IsContainPoint(PointAtDistAndAngle(basePoint, 8888, 88)))
 	fmt.Println(line.IsContainPoint(PointAtDistAndAngle(basePoint, 10000, 88)))
 	fmt.Println(line.IsContainPoint(GeoPoint{Lat: 39.783855, Lng: 116.27635}))
-	fmt.Printf("------------end %s------------\n", f.Name())
+	testEnd()
 }
 
 func TestGeoPloygon_FormatStringArray(t *testing.T) {
+	testStart()
 	ployon := GetTestPolygon1()
 	s := ployon.FormatStringArray()
 	for _, ss := range s {
 		fmt.Println(ss)
 	}
+
+	testEnd()
 }
 
 func TestGeoHashDecodeBits(t *testing.T) {
-	pc, _, _, _ := runtime.Caller(0)
-	f := runtime.FuncForPC(pc)
-	fmt.Printf("\n\n\n------------start %s------------\n", f.Name())
+	testStart()
 	lat := 39.956981
 	lng := 116.440488
 	var i uint8
@@ -276,13 +256,11 @@ func TestGeoHashDecodeBits(t *testing.T) {
 			"precision=%d\tdist=%v x %v\tdist=%v x %v\n",
 			i, int(rect.Width()), int(rect.Height()), int(rect1.Width()), int(rect1.Height()))
 	}
-	fmt.Printf("------------end %s------------\n", f.Name())
+	testEnd()
 }
 
 func TestGeoHashBitsNeighbors(t *testing.T) {
-	pc, _, _, _ := runtime.Caller(0)
-	f := runtime.FuncForPC(pc)
-	fmt.Printf("\n\n\n------------start %s------------\n", f.Name())
+	testStart()
 	lat := 39.956981
 	lng := 116.440488
 	var pre uint8 = 15
@@ -292,9 +270,11 @@ func TestGeoHashBitsNeighbors(t *testing.T) {
 		fmt.Fprintf(os.Stdout, "dist=%v x %v\n", int(rect.Width()), int(rect.Height()))
 		fmt.Println(rect.GetRectVertex())
 	}
-	fmt.Printf("------------end %s------------\n", f.Name())
+	testEnd()
 }
 
 func TestGeo_JustTest(t *testing.T) {
+	testStart()
 
+	testEnd()
 }

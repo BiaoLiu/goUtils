@@ -6,41 +6,47 @@ package goUtils
 
 import (
 	"fmt"
+	"golang.org/x/crypto/ssh/terminal"
 	"math"
 	"math/rand"
 	"os"
 	"strings"
+	"time"
 )
 
 var (
-	LocalHostIP       = ""
-	GlobalIDGenerator *SnowFlakeIdGenerator
-	colorFns          = []ColorFunc{Green, LightGreen, Cyan, LightCyan, Red, LightRed, Yellow, Black, DarkGray, LightGray, White, Blue, LightBlue, Purple, LightPurple, Brown}
+	LocalHostIP         = ""
+	LocalHostIpArr      []string
+	LocalHostIpTraceId  = ""
+	SequenceIDGenerator *SnowFlakeIdGenerator
+	preTraceID          = ""
+	colorFns            = []ColorFunc{Green, LightGreen, Cyan, LightCyan, Red, LightRed, Yellow, Black, DarkGray, LightGray, White, Blue, LightBlue, Purple, LightPurple, Brown}
 )
 
 func init() {
 	//提取本机IP记录到日志里
 	ips := LocalIP()
-	var tmp []string
 	for _, ip := range ips {
 		if IsPrivateIP(ip) {
-			tmp = append(tmp, ip)
+			LocalHostIpArr = append(LocalHostIpArr, ip)
+			LocalHostIpTraceId = fmt.Sprintf("%s%x", LocalHostIpTraceId, Ip2long(ip))
 		}
 	}
-	LocalHostIP = strings.Join(tmp, ",")
+	LocalHostIP = strings.Join(LocalHostIpArr, ",")
 	//base62转码初始化
 	for k, v := range base62CharToInt {
 		base62IntToChar[v] = k
 	}
 	//ID生成器
 	var err error
-	GlobalIDGenerator, err = NewIDGenerator().
-		SetTimeBitSize(48).
-		SetSequenceBitSize(10).
-		SetWorkerIdBitSize(5).
-		SetWorkerId(30).Init()
+	SequenceIDGenerator, err = NewIDGenerator().
+		SetTimeBitSize(40).
+		SetSequenceBitSize(22).
+		SetWorkerIdBitSize(1).
+		SetWorkerId(1).Init()
 	if err != nil {
-		fmt.Fprintf(os.Stderr, "Init IDGenerator failed, err=%v\n", err)
+		errMsg := fmt.Sprintf("Init IDGenerator failed, err=%v", err)
+		BitchWarning(errMsg)
 	}
 }
 
@@ -49,6 +55,7 @@ func RandFloat64InRange(min, max float64) float64 {
 	if min >= max || min == 0 || max == 0 {
 		return max
 	}
+	rand.Seed(time.Now().UnixNano())
 	return rand.Float64()*(max-min) + min
 }
 
@@ -87,12 +94,26 @@ func FuckWarning(msg string) string {
 }
 
 //生成一个假的traceId
-func FakeTraceId() string {
-	genId, err := GlobalIDGenerator.NextId()
-	if err != nil {
-		return RandomStr(32, alphaNum1...)
+func FakeTraceId() (traceId string) {
+	for {
+		ReRandSeed()
+		traceId = fmt.Sprintf("%x%s%x", time.Now().UnixNano(), LocalHostIpTraceId, rand.Int63())
+		if preTraceID != traceId {
+			preTraceID = traceId
+			break
+		}
 	}
-	return fmt.Sprintf("%s%d%s", RandomStr(8, alphaNum1...), genId, RandomStr(8, alphaNum1...))
+	return traceId
+}
+
+//重新设置随机数种子
+func ReRandSeed() {
+	genId, err := SequenceIDGenerator.NextId()
+	if err != nil {
+		rand.Seed(time.Now().UnixNano())
+	} else {
+		rand.Seed(genId)
+	}
 }
 
 //根据业务特点，过滤非法的ID并去重，一般用于批量根据ID提取信息时
@@ -159,4 +180,9 @@ func MinInt64(args ...interface{}) (int64, error) {
 		}
 	}
 	return m, nil
+}
+
+//获取当前终端的宽、高信息：字符数，非终端时（如IDE的执行环境）会报错
+func GetTerminalSize() (width, height int, err error) {
+	return terminal.GetSize(int(os.Stdout.Fd()))
 }

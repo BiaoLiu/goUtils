@@ -68,6 +68,7 @@ func SliceReduce(slice []interface{}, a reduceCallbackFunc) (dSlice []interface{
 
 //从给定的slice里随机提取新的slice
 func SliceRand(a []interface{}) (b interface{}) {
+	ReRandSeed()
 	randnum := rand.Intn(len(a))
 	b = a[randnum]
 	return
@@ -149,10 +150,57 @@ func SliceUnique(slice []interface{}) (uniqueSlice []interface{}) {
 
 //打乱一个slice
 func SliceShuffle(slice []interface{}) []interface{} {
-	for i := 0; i < len(slice); i++ {
-		a := rand.Intn(len(slice))
-		b := rand.Intn(len(slice))
+	ReRandSeed()
+	sliceLen := len(slice)
+	for i := 0; i < sliceLen; i++ {
+		a := rand.Intn(sliceLen)
+		b := rand.Intn(sliceLen)
 		slice[a], slice[b] = slice[b], slice[a]
 	}
 	return slice
+}
+
+//转为字符串slice
+func ToStringSlice(arg []interface{}, ignoreErr bool) (ret []string, err error) {
+	for _, v := range arg {
+		vStr, err := TryBestToString(v)
+		if err != nil {
+			if ignoreErr {
+				continue
+			}
+			return ret, err
+		}
+		ret = append(ret, vStr)
+	}
+	return
+}
+
+//转为int64地slice
+func ToInt64Slice(arg []interface{}, ignoreErr bool) (ret []int64, err error) {
+	for _, v := range arg {
+		vInt64, err := TryBestToInt64(v)
+		if err != nil {
+			if ignoreErr {
+				continue
+			}
+			return ret, err
+		}
+		ret = append(ret, vInt64)
+	}
+	return
+}
+
+//转为float64地slice
+func ToFloat64Slice(arg []interface{}, ignoreErr bool) (ret []float64, err error) {
+	for _, v := range arg {
+		vFloat64, err := TryBestToFloat(v)
+		if err != nil {
+			if ignoreErr {
+				continue
+			}
+			return ret, err
+		}
+		ret = append(ret, vFloat64)
+	}
+	return
 }

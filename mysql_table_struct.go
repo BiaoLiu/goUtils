@@ -98,14 +98,14 @@ func GetAllMySQLTables(db *DBase) (ret []string, err error) {
 }
 
 //mysql表信息
-type MySQLTableInfo struct {
+type mysqlTableInfo struct {
 	TableName    string           //表名
 	TableComment string           //表注释
-	Fields       []MySQLFieldInfo //所有的字段列表
+	Fields       []mysqlFieldInfo //所有的字段列表
 }
 
 //mysql表的字段结构体，用于自动生成相应的go结构体用的
-type MySQLFieldInfo struct {
+type mysqlFieldInfo struct {
 	FieldName    string //字段名称
 	DataType     string //数据类型
 	IsUnsigned   bool   //是否为无符号类型
@@ -113,22 +113,22 @@ type MySQLFieldInfo struct {
 }
 
 /**
-0 CREATE TABLE `admin_menu` (
-1   `menu_id` int(11) NOT NULL AUTO_INCREMENT COMMENT '菜单ID',
-2   `menu_name` varchar(100) NOT NULL DEFAULT '' COMMENT '菜单名称',
-3   `menu_path` varchar(100) NOT NULL DEFAULT '' COMMENT '菜单路径',
-4   `icon_name` varchar(100) NOT NULL DEFAULT '' COMMENT '图标名称',
-5   `icon_color` varchar(100) NOT NULL DEFAULT '' COMMENT '图标的颜色',
-6   `parent_menu_id` int(11) NOT NULL DEFAULT '0' COMMENT '父菜单ID',
-7   `child_menu_num` int(11) NOT NULL DEFAULT '0' COMMENT '子菜单数量',
-8   `menu_sort` int(11) NOT NULL DEFAULT '0' COMMENT '同级菜单的排序值',
-9   PRIMARY KEY (`menu_id`)
-10 ) ENGINE=InnoDB AUTO_INCREMENT=13 DEFAULT CHARSET=utf8 COMMENT='菜单表'
+CREATE TABLE `admin_menu` (
+   `menu_id` int(11) NOT NULL AUTO_INCREMENT COMMENT '菜单ID',
+   `menu_name` varchar(100) NOT NULL DEFAULT '' COMMENT '菜单名称',
+   `menu_path` varchar(100) NOT NULL DEFAULT '' COMMENT '菜单路径',
+   `icon_name` varchar(100) NOT NULL DEFAULT '' COMMENT '图标名称',
+   `icon_color` varchar(100) NOT NULL DEFAULT '' COMMENT '图标的颜色',
+   `parent_menu_id` int(11) NOT NULL DEFAULT '0' COMMENT '父菜单ID',
+   `child_menu_num` int(11) NOT NULL DEFAULT '0' COMMENT '子菜单数量',
+   `menu_sort` int(11) NOT NULL DEFAULT '0' COMMENT '同级菜单的排序值',
+   PRIMARY KEY (`menu_id`)
+) ENGINE=InnoDB AUTO_INCREMENT=13 DEFAULT CHARSET=utf8 COMMENT='菜单表'
 */
 //获取表的结构
 func GetMySQLTableStruct(db *DBase, tableName string) (ret string, err error) {
-	var tableInfo MySQLTableInfo
-	querySQL := fmt.Sprintf("SHOW CREATE TABLE %s", tableName)
+	var tableInfo mysqlTableInfo
+	querySQL := fmt.Sprintf("SHOW CREATE TABLE `%s`", tableName)
 	tmpRows, err := db.FetchRows(querySQL)
 	if err != nil || len(tmpRows) <= 0 {
 		return
@@ -150,7 +150,7 @@ func GetMySQLTableStruct(db *DBase, tableName string) (ret string, err error) {
 	unsignedReg, _ := regexp.Compile(`.*?(?i:unsigned(.*?))`)
 	fieldStrList := splitReg.Split(fieldStr, -1)
 	for _, fieldInfo := range fieldStrList {
-		var f MySQLFieldInfo
+		var f mysqlFieldInfo
 		fieldAttr := fieldReg.FindStringSubmatch(strings.TrimSpace(fieldInfo))
 		if len(fieldAttr) <= 2 {
 			continue
@@ -170,70 +170,58 @@ func GetMySQLTableStruct(db *DBase, tableName string) (ret string, err error) {
 
 	//开始生成go结构体
 	buf := bytes.Buffer{}
-	if len(tableInfo.TableComment) > 0 {
-		buf.WriteString(fmt.Sprintf("//%s\n", tableInfo.TableComment))
+	if len(tableInfo.TableComment) <= 0 {
+		tableInfo.TableComment = fmt.Sprintf("table %s", tableName)
 	}
-	buf.WriteString(fmt.Sprintf("type %s struct {\n", formatFieldName(tableName)))
+	buf.WriteString(fmt.Sprintf("//%s\n", tableInfo.TableComment))
+	buf.WriteString(fmt.Sprintf("type %s struct {\n", FormatFieldNameToGolangType(tableName)))
 	for _, fieldInfo := range tableInfo.Fields {
-		fn := fieldInfo.FieldName
-		goFn := formatFieldName(fn)
-		t := mysqlTypeToGoType(fieldInfo.DataType, fieldInfo.IsUnsigned)
-		comment := fieldInfo.FieldComment
-		if len(comment) <= 0 {
-			comment = fn
+		mysqlFieldName := fieldInfo.FieldName
+		goFieldName := FormatFieldNameToGolangType(mysqlFieldName)
+		goType := mysqlTypeToGoType(fieldInfo.DataType, fieldInfo.IsUnsigned)
+		mysqlComment := fieldInfo.FieldComment
+		if len(mysqlComment) <= 0 {
+			mysqlComment = mysqlFieldName
 		}
-		buf.WriteString(fmt.Sprintf("\t%s %s `json:\"%s\" db:\"%s\"`//%s\n", goFn, t, fn, fn, comment))
+		buf.WriteString(fmt.Sprintf("\t%s %s `json:\"%s\" db:\"%s\"`//%s\n", goFieldName, goType, mysqlFieldName, mysqlFieldName, mysqlComment))
 	}
 	buf.WriteString("}\n\n")
 	return buf.String(), nil
 }
 
 //格式字段的名称
-func formatFieldName(fieleName string) string {
+func FormatFieldNameToGolangType(fieleName string) string {
 	//如果首字符为数字则要转换一下
 	first := fieleName[:1]
-	i, err := strconv.ParseInt(first, 10, 8)
+	firstChar, err := strconv.ParseInt(first, 10, 8)
 	if err == nil {
-		fieleName = intToWordMap[i] + "_" + fieleName[1:]
+		fieleName = intToWordMap[firstChar] + "_" + fieleName[1:]
 	}
-	name := lintFieldName(fieleName)
-	runes := []rune(name)
-	for i, c := range runes {
-		ok := unicode.IsLetter(c) || unicode.IsDigit(c)
-		if i == 0 {
-			ok = unicode.IsLetter(c)
-		}
-		if !ok {
-			runes[i] = '_'
-		}
+	if fieleName == "_" {
+		return fieleName
 	}
-	return string(runes)
-}
-
-func lintFieldName(name string) string {
-	if name == "_" {
-		return name
+	//去掉前面的下划线
+	for len(fieleName) > 0 && fieleName[0] == '_' {
+		fieleName = fieleName[1:]
 	}
-	for len(name) > 0 && name[0] == '_' {
-		name = name[1:]
-	}
+	//判断是否全为小写
 	allLower := true
-	for _, r := range name {
+	for _, r := range fieleName {
 		if !unicode.IsLower(r) {
 			allLower = false
 			break
 		}
 	}
+	runes := []rune(fieleName)
+	//如果全为小写的话，判断是不是为常用的缩写
 	if allLower {
-		runes := []rune(name)
-		if u := strings.ToUpper(name); commonInitialisms[u] {
+		if u := strings.ToUpper(fieleName); commonInitialisms[u] {
 			copy(runes[0:], []rune(u))
 		} else {
 			runes[0] = unicode.ToUpper(runes[0])
 		}
 		return string(runes)
 	}
-	runes := []rune(name)
 	w, i := 0, 0
 	for i+1 <= len(runes) {
 		eow := false
@@ -265,6 +253,16 @@ func lintFieldName(name string) string {
 		}
 		w = i
 	}
+	//再处理一次
+	for i, c := range runes {
+		ok := unicode.IsLetter(c) || unicode.IsDigit(c)
+		if i == 0 {
+			ok = unicode.IsLetter(c)
+		}
+		if !ok {
+			runes[i] = '_'
+		}
+	}
 	return string(runes)
 }
 
@@ -292,5 +290,5 @@ func mysqlTypeToGoType(mysqlType string, isUnsigned bool) string {
 	case "binary", "blob", "longblob", "mediumblob", "varbinary":
 		return "[]byte"
 	}
-	return ""
+	return "interface{}"
 }

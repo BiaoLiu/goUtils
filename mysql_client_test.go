@@ -2,14 +2,13 @@ package goUtils
 
 import (
 	"fmt"
-	"runtime"
+	"os"
 	"testing"
 )
 
 func TestDBase_Conn(t *testing.T) {
-	pc, _, _, _ := runtime.Caller(0)
-	f := runtime.FuncForPC(pc)
-	fmt.Printf("\n\n\n------%s--------\n", f.Name())
+	testStart()
+
 	myconf := MySQLConf{
 		Host:    "10.96.114.84",
 		User:    "phpmyadmin",
@@ -27,12 +26,13 @@ func TestDBase_Conn(t *testing.T) {
 	sql := "select * from videoinfo limit 10"
 	ret, err := db.FetchRows(sql)
 	fmt.Println(ret, err)
+
+	testEnd()
 }
 
 func TestDBase_InsertBatchData(t *testing.T) {
-	pc, _, _, _ := runtime.Caller(0)
-	f := runtime.FuncForPC(pc)
-	fmt.Printf("\n\n\n------%s--------\n", f.Name())
+	testStart()
+
 	myconf := MySQLConf{
 		Host:       "10.96.114.84",
 		User:       "phpmyadmin",
@@ -58,9 +58,13 @@ func TestDBase_InsertBatchData(t *testing.T) {
 	}
 	ret, b, e := db.InsertBatchData("test", fields, data, true)
 	fmt.Println(ret, b, e)
+
+	testEnd()
 }
 
 func TestGetMySQLTableStruct(t *testing.T) {
+	testStart()
+
 	myconf := MySQLConf{
 		Host:       "10.96.114.84",
 		User:       "phpmyadmin",
@@ -79,9 +83,13 @@ func TestGetMySQLTableStruct(t *testing.T) {
 	}
 	ret, err := GetMySQLTableStruct(db, "admin_menu")
 	fmt.Println(err, ret)
+
+	testEnd()
 }
 
 func TestGetAllMySQLTables(t *testing.T) {
+	testStart()
+
 	myconf := MySQLConf{
 		Host:       "10.96.114.84",
 		User:       "phpmyadmin",
@@ -100,9 +108,12 @@ func TestGetAllMySQLTables(t *testing.T) {
 	}
 	ret, err := GetAllMySQLTables(db)
 	fmt.Println(err, ret)
+	testEnd()
 }
 
 func TestGetMySQLAllTablesStruct(t *testing.T) {
+	testStart()
+
 	myconf := MySQLConf{
 		Host:       "10.96.114.84",
 		User:       "phpmyadmin",
@@ -118,4 +129,23 @@ func TestGetMySQLAllTablesStruct(t *testing.T) {
 	fmt.Println(err)
 	str, _ := GetMySQLAllTablesStruct(db)
 	fmt.Println(str)
+	testEnd()
+}
+
+func TestFormatFieldNameToGolangType(t *testing.T) {
+	testStart()
+
+	fields := []string{
+		"api",
+		"1user",
+		"user_name",
+		"user1",
+		"menuName",
+		"user_Name",
+		"_http_status_",
+	}
+	for _, f := range fields {
+		fmt.Fprintf(os.Stdout, "fieldName:%s\tformatFieldName:%s\n", f, FormatFieldNameToGolangType(f))
+	}
+	testEnd()
 }

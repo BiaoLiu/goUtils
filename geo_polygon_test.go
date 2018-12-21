@@ -11,7 +11,6 @@ import (
 	"io"
 	"math"
 	"os"
-	"runtime"
 	"testing"
 	"time"
 )
@@ -21,9 +20,7 @@ var testSplitPolygonGeoHashPrecision = customDeliveryGeoHashPrecision
 var splitPolygonRectGeoHashTypeForWendao = GEOHASH_TYPE_NORMAL
 
 func TestGeoPolygon_SplitGeoHashRect(t *testing.T) {
-	pc, _, _, _ := runtime.Caller(0)
-	f := runtime.FuncForPC(pc)
-	fmt.Printf("\n\n\n------------start %s------------\n", f.Name())
+	testStart()
 	var polygon GeoPolygon
 	testSplitPolygonGeoHashPrecision = 6
 	isRay := true //采用射线法切割多边形
@@ -78,7 +75,7 @@ func TestGeoPolygon_SplitGeoHashRect(t *testing.T) {
 	}
 	avg := total / float64(size)
 	fmt.Println(avg)
-	fmt.Printf("------------end %s------------\n", f.Name())
+	testEnd()
 }
 
 //凸多边形：http://10.96.112.48/polygon1.html

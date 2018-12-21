@@ -8,14 +8,11 @@
 package goUtils
 
 import (
-	"fmt"
 	"math"
 	"math/rand"
-	"os"
 	"regexp"
 	"strconv"
 	"strings"
-	"time"
 )
 
 const (
@@ -185,14 +182,14 @@ func GenPolygons(baseRect GeoRectangle, polygonNum, pointMinNum, pointMaxNum int
 	if pointMinNum < 3 {
 		return
 	}
-	fmt.Fprintf(os.Stdout, "start GenPolygons：baseRect[%d x %d] polygonNum[%d] pointMinNum[%d] pointMaxNum[%d]\n", int(width), int(height), polygonNum, pointMinNum, pointMaxNum)
+	LogInfo("start GenPolygons：baseRect[%d x %d] polygonNum[%d] pointMinNum[%d] pointMaxNum[%d]\n", int(width), int(height), polygonNum, pointMinNum, pointMaxNum)
 	diffNum := pointMaxNum - pointMinNum + 1
 	var randFloat float64
 	diffLat := baseRect.MaxLat - baseRect.MinLat
 	diffLng := baseRect.MaxLng - baseRect.MinLng
 	//开始随机生成多边形
 	for i := 0; i < polygonNum; i++ {
-		rand.Seed(time.Now().UnixNano() + int64(i))
+		ReRandSeed()
 		//顶点的数量
 		vertexNum := rand.Intn(diffNum) + pointMinNum
 		var points []GeoPoint
@@ -200,11 +197,11 @@ func GenPolygons(baseRect GeoRectangle, polygonNum, pointMinNum, pointMaxNum int
 		for vn := 0; vn < vertexNum; vn++ {
 			//确保一个多边形的边都不相交
 			for {
-				rand.Seed(time.Now().UnixNano() + int64(vn))
+				ReRandSeed()
 				randFloat = rand.Float64()
 				//新生点的纬度
 				lat := baseRect.MinLat + randFloat*diffLat
-				rand.Seed(time.Now().UnixNano() + int64(vn+1))
+				ReRandSeed()
 				randFloat = rand.Float64()
 				//新生点的经度
 				lng := baseRect.MinLng + randFloat*diffLng

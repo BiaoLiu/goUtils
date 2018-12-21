@@ -155,7 +155,7 @@ func FileExists(filePath string) bool {
 //打开文件，得到一个句柄。如果不存在创建一个，如果存在再判断
 func OpenNewFile(fileName, bakExt string, isBak bool) (fp *os.File, err error) {
 	if isBak && len(bakExt) == 0 {
-		bakExt = fmt.Sprintf("bak.%s", time.Now().Local().Format("20060102150405"))
+		bakExt = fmt.Sprintf("%s.bak", time.Now().Local().Format("2006-01-02T15:04:05.000"))
 	}
 	if FileExists(fileName) {
 		if isBak {
@@ -178,4 +178,18 @@ func OpenNewFile(fileName, bakExt string, isBak bool) (fp *os.File, err error) {
 	}
 	fp, err = os.Create(fileName)
 	return
+}
+
+//文件最后修改时间
+func FileModTime(filename string) (int64, error) {
+	fd, err := os.Open(filename)
+	if err != nil {
+		return 0, err
+	}
+	defer fd.Close()
+	fileinfo, err := fd.Stat()
+	if err != nil {
+		return 0, err
+	}
+	return fileinfo.ModTime().Unix(), nil
 }

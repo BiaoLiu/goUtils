@@ -14,7 +14,6 @@ import (
 	"regexp"
 	"sort"
 	"strings"
-	"time"
 	"unicode"
 )
 
@@ -114,7 +113,9 @@ func StrSliceShuffle(slice []string) []string {
 		return slice
 	}
 	for i := 0; i < sl; i++ {
+		ReRandSeed()
 		a := rand.Intn(sl)
+		ReRandSeed()
 		b := rand.Intn(sl)
 		slice[a], slice[b] = slice[b], slice[a]
 	}
@@ -138,7 +139,7 @@ func Substr(str string, start int, end int) string {
 	if start > end || end < 0 || start < 0 {
 		return ""
 	}
-	return string(rs[start:end])
+	return string(rs[start : end+1])
 }
 
 //去重（不保证原顺序）
@@ -183,12 +184,13 @@ func RandomStr(n int, alphabets ...byte) string {
 	}
 	var byteSlice = make([]byte, n)
 	var randBy bool
+	ReRandSeed()
 	if num, err := rand.Read(byteSlice); num != n || err != nil {
-		rand.Seed(time.Now().UnixNano())
 		randBy = true
 	}
 	for i, b := range byteSlice {
 		if randBy {
+			ReRandSeed()
 			byteSlice[i] = alphabets[rand.Intn(len(alphabets))]
 		} else {
 			byteSlice[i] = alphabets[b%byte(len(alphabets))]
@@ -288,4 +290,59 @@ func IsAllNumber(str string) bool {
 		return false
 	}
 	return true
+}
+
+//解析字符串，高仿PHP的http://php.net/manual/zh/function.parse-str.php
+//"first=value&arr[]=foo+bar&arr[]=baz";
+func ParseStr(str string) (ret map[string][]ElemType) {
+	ret = make(map[string][]ElemType)
+	tmpRet := map[string]*[]ElemType{}
+	fArr := strings.Split(str, "&")
+	if len(fArr) <= 0 {
+		return
+	}
+	for _, arg := range fArr {
+		//可以包含等号，也可以不包含
+		if !strings.Contains(arg, "=") {
+			tmpRet[arg] = &[]ElemType{MakeElemType("")}
+			continue
+		}
+		//截取第一个鹄等号前的
+		field := Substr(arg, 0, strings.Index(arg, "=")-1)
+		val := Substr(arg, strings.Index(arg, "=")+1, -1)
+		//如果字段名里有[]
+		if !strings.HasSuffix(field, "[]") {
+			tmpRet[field] = &[]ElemType{MakeElemType(val)}
+			continue
+		}
+		realFieldName := strings.TrimRight(field, "[]")
+		if tmpArr, ok := tmpRet[realFieldName]; ok {
+			*tmpArr = append(*tmpArr, MakeElemType(val))
+			continue
+		}
+		tmpRet[realFieldName] = &[]ElemType{MakeElemType(val)}
+	}
+	//腾挪一下结果
+	for k, vals := range tmpRet {
+		var tmp []ElemType
+		for _, val := range *vals {
+			tmp = append(tmp, val)
+		}
+		ret[k] = tmp
+	}
+	return
+}
+
+//打乱一个字符串
+func StrShuffle(str string) string {
+	rs := []rune(str)
+	sliceLen := len(rs)
+	for i := 0; i < sliceLen; i++ {
+		ReRandSeed()
+		a := rand.Intn(sliceLen)
+		ReRandSeed()
+		b := rand.Intn(sliceLen)
+		rs[a], rs[b] = rs[b], rs[a]
+	}
+	return string(rs)
 }

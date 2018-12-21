@@ -31,21 +31,28 @@ import (
 
 //构造一个请求结构体
 func NewHttpClient(httpUrl string, ctx context.Context) *HttpClient {
+	ret := NewEmptyHttpClient()
+	ret.SetCtx(ctx).SetUrl(httpUrl)
+	return ret
+}
+
+//构造空的
+func NewEmptyHttpClient() *HttpClient {
 	ret := &HttpClient{
 		hClient: &http.Client{
 			Transport: &http.Transport{
-				DisableKeepAlives: false,                                 //默认长链接
-				TLSClientConfig:   &tls.Config{InsecureSkipVerify: true}, //忽略证书校验
+				DisableKeepAlives:  true,                                  //默认不用长链接
+				DisableCompression: false,                                 //默认启用压缩
+				TLSClientConfig:    &tls.Config{InsecureSkipVerify: true}, //默认请求https时忽略证书校验
 			},
 		},
-		url:         httpUrl,
-		ctx:         ctx,                                          //上下文信息，自己传进来
 		timeout:     time.Duration(int64(3) * int64(time.Second)), //默认3秒
 		retry:       3,                                            //默认重试三次
 		headers:     make(http.Header),                            //头信息，所有的请求都要
 		buf:         new(bytes.Buffer),                            //最终body缓冲区，一般用于post/put
 		vals:        make(url.Values),                             //用于PostForm的KV列表
 		uploadFiles: []HttpUploadFile{},                           //上传文件的列表
+		traceId:     FakeTraceId(),
 	}
 	return ret
 }
@@ -63,6 +70,7 @@ type HttpClient struct {
 	keepalive   bool             //是否保持连接
 	proxy       string           //代理地理
 	ctx         context.Context  //需要的上下文信息
+	traceId     string           //追踪问题用的ID
 }
 
 //上传文件的设置
@@ -70,6 +78,12 @@ type HttpUploadFile struct {
 	FieldName string //上传文件时用的字段名称
 	FilePath  string //文件的绝对路径
 	FileName  string //上传时显示的文件名称，如果为空则取filePath的basename
+}
+
+//设置context
+func (ehc *HttpClient) SetCtx(ctx context.Context) *HttpClient {
+	ehc.ctx = ctx
+	return ehc
 }
 
 //设置整体超时时间，默认3秒
@@ -88,7 +102,7 @@ func (ehc *HttpClient) SetRetryTimes(t int) *HttpClient {
 //添加要上传的文件
 func (ehc *HttpClient) AddFile(fieldName, filePath, fileName string) *HttpClient {
 	if !FileExists(filePath) {
-		LogErrorf("_soda_eslib_http_AddFile_out||file=%v||file not exists", filePath)
+		LogErrorf("_HttpClient_AddFile_error||fieldName=%v||filePath=%v||fileName=%v||file not exists", fieldName, filePath, fileName)
 		return ehc
 	}
 	if len(fileName) <= 0 {
@@ -112,6 +126,12 @@ func (ehc *HttpClient) AddHeader(k string, v string) *HttpClient {
 func (ehc *HttpClient) SetHeader(k string, v string) *HttpClient {
 	ehc.headers.Set(k, v)
 	return ehc
+}
+
+//提取http.Transport进行二次设置
+func (ehc *HttpClient) GetHttpTransport() *http.Transport {
+	ret := ehc.hClient.Transport.(*http.Transport)
+	return ret
 }
 
 //批量设置头信息
@@ -150,7 +170,8 @@ func (ehc *HttpClient) SetUrl(u string) *HttpClient {
 
 //设置长连接选项
 func (ehc *HttpClient) SetKeepAlive(b bool) *HttpClient {
-	ehc.hClient.Transport.(*http.Transport).DisableKeepAlives = !b
+	trans := ehc.GetHttpTransport()
+	trans.DisableKeepAlives = !b
 	return ehc
 }
 
@@ -161,9 +182,16 @@ func (ehc *HttpClient) SetProxy(proxyHost string) *HttpClient {
 	if check {
 		proxyHost = "http://" + proxyHost
 	}
-	ehc.hClient.Transport.(*http.Transport).Proxy = func(_ *http.Request) (*url.URL, error) {
+	trans := ehc.GetHttpTransport()
+	trans.Proxy = func(_ *http.Request) (*url.URL, error) {
 		return url.Parse(proxyHost)
 	}
+	return ehc
+}
+
+//设置跳转策略
+func (ehc *HttpClient) SetCheckRedirectFunc(policy func(req *http.Request, via []*http.Request) error) *HttpClient {
+	ehc.hClient.CheckRedirect = policy
 	return ehc
 }
 
@@ -215,11 +243,7 @@ func (ehc *HttpClient) GetContentType() string {
 	if len(contentType) > 0 {
 		return contentType
 	}
-	contentType = ehc.headers.Get("content-type")
-	if len(contentType) > 0 {
-		return contentType
-	}
-	return ""
+	return ehc.headers.Get("content-type")
 }
 
 //添加单个cookie的键值
@@ -267,7 +291,7 @@ func (ehc *HttpClient) SetBasicAuth(username, password string) *HttpClient {
 }
 
 //批量添加字段，一般是 PostForm 用，在即上传文件又有字段时Post也用
-func (ehc *HttpClient) AddFields(data map[string]string) *HttpClient {
+func (ehc *HttpClient) SetFields(data map[string]string) *HttpClient {
 	if len(data) > 0 {
 		for k, v := range data {
 			ehc.vals.Set(k, v)
@@ -277,8 +301,16 @@ func (ehc *HttpClient) AddFields(data map[string]string) *HttpClient {
 }
 
 //添加单个字段，POST用
-func (ehc *HttpClient) AddField(k, v string) *HttpClient {
+func (ehc *HttpClient) SetField(k, v string) *HttpClient {
 	ehc.vals.Set(k, v)
+	return ehc
+}
+
+//添加单个字段，可以添加数组，如 ：
+//client.AddField("a","1") 、client.AddField("a","2")
+//在接收的时候将收到 a=[1,2]
+func (ehc *HttpClient) AddField(k, v string) *HttpClient {
+	ehc.vals.Add(k, v)
 	return ehc
 }
 
@@ -288,7 +320,8 @@ func (ehc *HttpClient) GetBuffer() *bytes.Buffer {
 	return ehc.buf
 }
 
-//设置原始的请求的body信息，一般POST/PUT用得着，等同于httpClient.GetBuffer().Write(c)
+//设置原始的请求的body信息，像请求Apollo的接口时候就让提交json字符串，没有别的参数
+//一般只有POST/PUT用得着，等同于httpClient.GetBuffer().Write(c)
 func (ehc *HttpClient) SetRawRequestBody(b []byte) *HttpClient {
 	ehc.buf.Write(b)
 	return ehc
@@ -298,14 +331,18 @@ func (ehc *HttpClient) SetRawRequestBody(b []byte) *HttpClient {
 func (ehc *HttpClient) Get() (HttpResponse, error) {
 	httpReq, err := http.NewRequest("GET", ehc.url, nil)
 	if err != nil {
-		LogErrorf("_soda_eslib_http_Get_out||%v||err=%v||http.NewRequest failed", ehc.getComErrMsg(), err)
+		LogErrorf("_HttpClient_Get_error||%v||err=%v||http.NewRequest failed", ehc.getComErrMsg(), err)
 		return HttpResponse{}, err
 	}
 	response, err := ehc.do(httpReq)
+	if err != nil {
+		LogErrorf("_HttpClient_Get_failure||%v||err=%v", ehc.getComErrMsg(), err)
+		return HttpResponse{}, err
+	}
 	return ehc.processResponse(response, err)
 }
 
-//发起POST请求并返回数据，一般没有上传文件
+//发起POST请求并返回数据，没有上传文件，只是简单的模拟提交表单操作
 func (ehc *HttpClient) PostForm() (HttpResponse, error) {
 	ehc.SetContentTypeFormUrlEncoded()
 	return ehc.Post()
@@ -315,16 +352,19 @@ func (ehc *HttpClient) PostForm() (HttpResponse, error) {
 func (ehc *HttpClient) Head() (HttpResponse, error) {
 	httpReq, err := http.NewRequest("HEAD", ehc.url, nil)
 	if err != nil {
-		err = fmt.Errorf("_soda_eslib_http_Head_out||%v||err=%v||http.NewRequest failed", ehc.getComErrMsg(), err)
-		LogError(err)
+		LogErrorf("_HttpClient_Head_error||%v||err=%v||http.NewRequest failed", ehc.getComErrMsg(), err)
 		return HttpResponse{}, err
 	}
 	resp, err := ehc.do(httpReq)
-	LogInfof("_soda_eslib_http_Head_out||%v||err=%v", ehc.getComErrMsg(), err)
+	if err != nil {
+		LogErrorf("_HttpClient_Head_failure||%v||head http request failed|||err=%v", ehc.getComErrMsg(), err)
+		return HttpResponse{}, err
+	}
 	return ehc.processResponse(resp, err)
 }
 
 //发起POST请求并返回数据，有字段、上传文件，或者raw post用的
+//一般，raw post body 不会和上传文件、其他from表单信息同时出现
 func (ehc *HttpClient) Post() (HttpResponse, error) {
 	//如果buf为空，要用KV值、上传的文件填充buf，否则就是要POST的raw body
 	//因为writer在关闭时会在数据的尾部加上一串东西
@@ -336,11 +376,10 @@ func (ehc *HttpClient) Post() (HttpResponse, error) {
 	//此处传一个临时的buf进去，保留原始的buf信息
 	tmpBuf := bytes.Buffer{}
 	tmpBuf.Write(ehc.buf.Bytes())
-	//注意，此处传进去的tmpBuf经过sodaClient.Do()处理后就没了
+	//注意，如果要用go-http原生的库，此处传进去的tmpBuf经过sodaClient.Do()处理后就没了
 	httpReq, err := http.NewRequest("POST", ehc.url, &tmpBuf)
 	if err != nil {
-		err = fmt.Errorf("_soda_eslib_http_Post_out||%v||err=%v||http.NewRequest failed", ehc.getComErrMsg(), err)
-		LogError(err)
+		LogErrorf("_HttpClient_Post_error||%v||err=%v||http.NewRequest failed", ehc.getComErrMsg(), err)
 		return HttpResponse{}, err
 	}
 	//提取content-type类型，如果为空要设置值
@@ -350,7 +389,10 @@ func (ehc *HttpClient) Post() (HttpResponse, error) {
 	}
 	//调用go-http的相关方法来处理
 	resp, err := ehc.do(httpReq)
-	LogInfof("_soda_eslib_http_Post_out||%v||err=%v", ehc.getComErrMsg(), err)
+	if err != nil {
+		LogErrorf("_HttpClient_Post_failure||%v||err=%v", ehc.getComErrMsg(), err)
+		return HttpResponse{}, err
+	}
 	return ehc.processResponse(resp, err)
 }
 
@@ -362,36 +404,52 @@ func (ehc *HttpClient) procWriter() *multipart.Writer {
 	for _, f := range ehc.uploadFiles {
 		formFile, err := writer.CreateFormFile(f.FieldName, f.FileName)
 		if err != nil {
-			LogErrorf("_soda_eslib_http_AddFile_out||%v||file=%v||err=%v||CreateFormFile failed", commErrMsg, f.FilePath, err)
+			LogErrorf("_HttpClient_procWriter_error||%v||file=%v||err=%v||CreateFormFile failed", commErrMsg, f.FilePath, err)
 			continue
 		}
 		srcFile, err := os.Open(f.FilePath)
 		if err != nil {
-			LogErrorf("_soda_eslib_http_AddFile_out||%v||err=%v||file=%v||open file failed", commErrMsg, err, f.FilePath)
+			LogErrorf("_HttpClient_procWriter_error||%v||err=%v||file=%v||open file failed", commErrMsg, err, f.FilePath)
 			continue
 		}
 		_, err = io.Copy(formFile, srcFile)
 		if err != nil {
-			LogErrorf("_soda_eslib_http_AddFile_out||%v||err=%v||file=%v||copy file failed", commErrMsg, err, f.FilePath)
+			LogErrorf("_HttpClient_procWriter_error||%v||err=%v||file=%v||copy file failed", commErrMsg, err, f.FilePath)
 		}
 		err = srcFile.Close()
 		if err != nil {
-			LogErrorf("_soda_eslib_http_AddFile_out||%v||err=%v||file=%v||close file failed", commErrMsg, err, f.FilePath)
+			LogErrorf("_HttpClient_procWriter_error||%v||err=%v||file=%v||close file failed", commErrMsg, err, f.FilePath)
 		}
 	}
 	//写入POST的值
 	for k, vs := range ehc.vals {
-		if len(k) <= 0 {
+		if len(k) <= 0 || len(vs) <= 0 {
 			continue
 		}
-		err := writer.WriteField(k, vs[0])
+		var err error
+		//多个值拼装成数组发送
+		if len(vs) > 1 {
+			newKey := k
+			//必须以[]结尾，否则就要添加一个这东西
+			if !strings.HasSuffix(newKey, "[]") {
+				newKey = fmt.Sprintf("%s[]", newKey)
+			}
+			for _, v := range vs {
+				err = writer.WriteField(newKey, v)
+				if err != nil {
+					break
+				}
+			}
+		} else {
+			err = writer.WriteField(k, vs[0])
+		}
 		if err != nil {
-			LogErrorf("_soda_eslib_http_AddFile_out||%v||err=%v||WriteField failed", commErrMsg, err)
+			LogErrorf("_HttpClient_procWriter_error||%v||err=%v||key=%v||values=%+v||WriteField failed", commErrMsg, err, k, vs)
 		}
 	}
 	err := writer.Close()
 	if err != nil {
-		LogErrorf("_soda_eslib_http_AddFile_out||%v||err=%v||Writer Close failed", commErrMsg, err)
+		LogErrorf("_HttpClient_procWriter_error||%v||err=%v||Writer Close failed", commErrMsg, err)
 	}
 	return writer
 }
@@ -403,34 +461,37 @@ func (ehc *HttpClient) getComErrMsg() string {
 		vals = append(vals, fmt.Sprintf("%v=%v", k, v))
 	}
 	for k, v := range ehc.headers {
-		headers = append(headers, fmt.Sprintf("%v=%v", k, v))
+		headers = append(headers, fmt.Sprintf("%v:%v", k, v))
 	}
-	commErrMsg := fmt.Sprintf("url=%v||localIP=%v||timeout=%v||retry=%v||vals: %v||headers: %v",
-		ehc.url, LocalHostIP, ehc.timeout, ehc.retry, strings.Join(vals, ", "), strings.Join(headers, ", "))
+	commErrMsg := fmt.Sprintf("traceid=%v||url=%v||timeout=%v||retry=%v||vals=%v||headers=%v",
+		ehc.traceId, ehc.url, ehc.timeout, ehc.retry, strings.Join(vals, "&"), strings.Join(headers, ";"))
 	return commErrMsg
 }
 
 //处理响应信息
 func (ehc *HttpClient) processResponse(response *http.Response, err error) (HttpResponse, error) {
 	ret := HttpResponse{header: make(map[string]string)}
-	if response == nil {
-		return ret, err
-	}
 	commErrMsg := ehc.getComErrMsg()
 	if err != nil {
-		LogErrorf("_soda_eslib_http_processResponse_out||%v||err=%v", commErrMsg, err)
+		ret.err = err
+		LogErrorf("_HttpClient_processResponse_error||%v||err=%v", commErrMsg, err)
+		return ret, err
+	}
+	if response == nil {
+		err = fmt.Errorf("httpResponse is nil")
+		ret.err = err
 		return ret, err
 	}
 	defer func() {
 		err := response.Body.Close()
 		if err != nil {
-			LogErrorf("_soda_eslib_http_processResponse_out||%v||err=%v||response.Body.Close() failed", commErrMsg, err)
+			LogErrorf("_HttpClient_processResponse_failure||%v||err=%v||response.Body.Close() failed", commErrMsg, err)
 		}
 	}()
 	body, err := ioutil.ReadAll(response.Body)
 	if err != nil {
 		ret.err = err
-		LogErrorf("_soda_eslib_http_processResponse_out||%v||err=%v||read resp body failed", commErrMsg, err)
+		LogErrorf("_HttpClient_processResponse_error||%v||err=%v||read resp body failed", commErrMsg, err)
 		return ret, err
 	}
 	ret.body = body
@@ -451,16 +512,18 @@ func (ehc *HttpClient) processResponse(response *http.Response, err error) (Http
 			ret.location = loc.String()
 		} else {
 			ret.err = err
-			LogErrorf("_soda_eslib_http_processResponse_out||%v||err=%v||read resp location", commErrMsg, err)
+			LogErrorf("_HttpClient_processResponse_error||%v||err=%v||read resp location failed", commErrMsg, err)
 		}
 	}
 	return ret, nil
 }
 
-//执行请求操作，从go-http里扒过来的方法
+//执行请求操作，源自杜欢的 go-http 库！
+//主要的处理逻辑是从go-http里扒过来的方法，那个库依赖的东西太多了，而且有时候更新不会做向前兼容
 func (ehc *HttpClient) do(httpReq *http.Request) (resp *http.Response, err error) {
+	ehc.traceId = FakeTraceId()
 	httpReq.URL, _ = url.Parse(ehc.url)
-	//设置请求的header信息
+	//设置请求的header信息【没有处理同一个key多个值的情况】
 	for k, v := range ehc.headers {
 		if len(k) <= 0 || len(v) <= 0 {
 			continue
@@ -472,13 +535,14 @@ func (ehc *HttpClient) do(httpReq *http.Request) (resp *http.Response, err error
 	var nextBody io.ReadCloser
 	var retry int
 	var statusCode int
+
 	startTime := time.Now().UnixNano()
 	defer func() {
 		procTime := ProcTime(startTime, time.Now().UnixNano())
 		var status, errmsg, code string
 		if err == nil {
 			status = "success"
-			if statusCode != 0 && statusCode != http.StatusOK {
+			if statusCode != 0 {
 				code = strconv.Itoa(statusCode)
 			}
 		} else {
@@ -486,7 +550,8 @@ func (ehc *HttpClient) do(httpReq *http.Request) (resp *http.Response, err error
 			code = "error"
 			errmsg = fmt.Sprintf("||errmsg=%v", err)
 		}
-		LogInfof("status=%v||proc_time=%f||code=%v%v", status, procTime, code, errmsg)
+		//每个http请求都会打印的一条日志信息
+		LogInfof("_HttpClient_%v||%v||proc_time=%f||code=%v%v", status, ehc.getComErrMsg(), procTime, code, errmsg)
 	}()
 
 	//重试次数
@@ -500,7 +565,7 @@ func (ehc *HttpClient) do(httpReq *http.Request) (resp *http.Response, err error
 		resp = nil
 		err = ehc.ctx.Err()
 		if err != nil {
-			LogErrorf("_soda_eslib_httpClient_error||%v||err=ctx.Err||msg=%v", ehc.getComErrMsg(), err)
+			LogErrorf("_HttpClient_error||%v||msg=ctx.Err||err=%v", ehc.getComErrMsg(), err)
 			return
 		}
 
@@ -533,7 +598,10 @@ func (ehc *HttpClient) do(httpReq *http.Request) (resp *http.Response, err error
 				if nextBody == nil {
 					if body == nil {
 						buf := &bytes.Buffer{}
-						io.Copy(buf, httpReq.Body)
+						_, err := io.Copy(buf, httpReq.Body)
+						if err != nil {
+							LogErrorf("_HttpClient_error||%v||err=copy httpBody to buffer failed||err=%v", ehc.getComErrMsg(), err)
+						}
 						body = buf.Bytes()
 					}
 					nextBody = ioutil.NopCloser(bytes.NewBuffer(body))
@@ -544,7 +612,7 @@ func (ehc *HttpClient) do(httpReq *http.Request) (resp *http.Response, err error
 				httpReq.Body = nextBody
 			}
 		}
-		httpReq.Header.Set("custom-header-traceid", FakeTraceId())
+		httpReq.Header.Set("header-traceid", ehc.traceId)
 
 		//开始请求http接口
 		resp, err = ehc.hClient.Do(httpReq)
@@ -554,7 +622,7 @@ func (ehc *HttpClient) do(httpReq *http.Request) (resp *http.Response, err error
 
 		// 根据官方文档，仅当 err != nil 的时候是可以自动重试，其他情况下都不应该重试。
 		if err != nil {
-			LogErrorf("_soda_eslib_httpClient_error||%v||err=fail to send request||msg=%v", ehc.getComErrMsg(), err)
+			LogErrorf("_HttpClient_error||%v||err=fail to send request||err=%v", ehc.getComErrMsg(), err)
 			continue
 		}
 
@@ -572,6 +640,5 @@ func (ehc *HttpClient) do(httpReq *http.Request) (resp *http.Response, err error
 			err = errors.New("fail to send request")
 		}
 	}
-
 	return
 }

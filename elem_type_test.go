@@ -12,6 +12,8 @@ import (
 )
 
 func TestMakeElemType(t *testing.T) {
+	testStart()
+
 	data := "435"
 	ref := MakeElemType(data)
 	if !ref.IsString() {
@@ -31,4 +33,6 @@ func TestMakeElemType(t *testing.T) {
 	fmt.Println(err)
 	fmt.Printf("%# v\n", pretty.Formatter(sm))
 	fmt.Println(ref.IsSimpleType(), md.IsComplexType())
+
+	testEnd()
 }

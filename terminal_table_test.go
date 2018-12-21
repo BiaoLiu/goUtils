@@ -10,6 +10,8 @@ import (
 )
 
 func TestNewTerminalTable(t *testing.T) {
+	testStart()
+
 	table := NewTerminalTable()
 	table.SetHeader([]string{"index", "shopId", "shopName"})
 	reg, _ := regexp.Compile(`\s+`)
@@ -22,7 +24,9 @@ func TestNewTerminalTable(t *testing.T) {
 	}
 
 	fmt.Println(table.Render())
+	testEnd()
 }
+
 /**
 +-------+---------------------+------------------------------+
 |index  |shopId               |shopName                      |
@@ -89,7 +93,7 @@ func TestNewTerminalTable(t *testing.T) {
 +-------+---------------------+------------------------------+
 | 30    | 1152921509242339341 | 桥头排骨（金城路店）         |
 +-------+---------------------+------------------------------+
- */
+*/
 var tmpForTestShopList = []string{
 	"0 1152921533330227217 地锅一家人（家常炒菜）",
 	"1 1152921577701769238 家湘脆皮鸡(清扬路店)",

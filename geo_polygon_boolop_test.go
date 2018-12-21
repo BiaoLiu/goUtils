@@ -15,6 +15,8 @@ import (
 //交集及并集测试，要测试下面情况：
 //目前已知：只要有边完全重合时，计算有问题
 func TestGeoPolygon_BoolOperation(t *testing.T) {
+	testStart()
+
 	//一坨多边形的对对
 	funcs := []func() ([2]GeoPolygon, string){
 		getPolygonPairs1,      //两多边形完全没有交集
@@ -90,6 +92,7 @@ func TestGeoPolygon_BoolOperation(t *testing.T) {
 			fmt.Sprintf(titleFormat, title, "求差集结果"),
 		)
 	}
+	testEnd()
 }
 
 //两多边形完全没有交集

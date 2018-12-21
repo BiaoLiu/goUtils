@@ -11,6 +11,10 @@ import (
 )
 
 func TestNewTplBuilder(t *testing.T) {
-	d := CommonTplFuncs["date"].(func(timestamp int64, format string) template.HTML)
+	testStart()
+
+	d := commonTplFuncs["date"].(func(timestamp int64, format string) template.HTML)
 	fmt.Println(d(time.Now().Unix(), "Y/m/d H:i:s"))
+
+	testEnd()
 }

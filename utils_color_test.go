@@ -6,6 +6,8 @@ import (
 )
 
 func TestCliColor(t *testing.T) {
+	testStart()
+
 	//默认的不带任何效果的字体显示
 	fmt.Println(Green("字体：Green"))
 	fmt.Println(LightGreen("字体：LightGreen"))
@@ -60,5 +62,5 @@ func TestCliColor(t *testing.T) {
 	fmt.Println(Purple("闪烁且带下划线字体：Purple", 1, 1))
 	fmt.Println(LightPurple("闪烁且带下划线字体：LightPurple", 1, 1))
 	fmt.Println(Brown("闪烁且带下划线字体：Brown", 1, 1))
-
+	testEnd()
 }

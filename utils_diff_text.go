@@ -1,3 +1,4 @@
+// 两段文本按行对比
 // @author      Liu Yongshuai<liuyongshuai@hotmail.com>
 // @date        2018-11-22 18:43
 

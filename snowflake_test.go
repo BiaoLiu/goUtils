@@ -3,10 +3,13 @@ package goUtils
 import (
 	"fmt"
 	"os"
+	"sync"
 	"testing"
 )
 
 func TestNewIDGenerator(t *testing.T) {
+	testStart()
+
 	b := "\t\t\t"
 	b2 := "\t\t\t\t\t"
 	d := "====================================="
@@ -62,13 +65,16 @@ func TestNewIDGenerator(t *testing.T) {
 		fmt.Printf("id=%d\ttimestamp=%d\tworkerId=%d\tsequence=%d\terr=%v\n",
 			id, ts, workerId, seq, err)
 	}
+	testEnd()
 }
 
 //多线程测试
 func TestSnowFlakeIdGenerator_MultiThread(t *testing.T) {
-	f := "./snowflake.txt"
+	testStart()
+
+	ff := "./snowflake.txt"
 	//准备写入的文件
-	fp, err := os.OpenFile(f, os.O_WRONLY|os.O_APPEND|os.O_CREATE, 0755)
+	fp, err := os.OpenFile(ff, os.O_WRONLY|os.O_APPEND|os.O_CREATE, 0755)
 	if err != nil {
 		fmt.Println(err)
 		t.Error(err)
@@ -81,10 +87,13 @@ func TestSnowFlakeIdGenerator_MultiThread(t *testing.T) {
 		t.Error(err)
 	}
 
+	wg := new(sync.WaitGroup)
+
 	//启动10个线程，出错就报出来
 	for i := 0; i < 10; i++ {
+		wg.Add(1)
 		go func() {
-			for {
+			for i := 0; i < 100; i++ {
 				gid, err := gentor.NextId()
 				if err != nil {
 					panic(err)
@@ -94,6 +103,11 @@ func TestSnowFlakeIdGenerator_MultiThread(t *testing.T) {
 					panic(err)
 				}
 			}
+			wg.Done()
 		}()
 	}
+	wg.Wait()
+	fp.Close()
+
+	testEnd()
 }

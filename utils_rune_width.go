@@ -14,9 +14,9 @@ import (
 //单个rune宽度 http://www.unicode.org/reports/tr11/
 func RuneWidth(r rune) int {
 	switch {
-	case r < 0 || r > 0x10FFFF || inTables(r, nonprint, combining, notassigned):
+	case r < 0 || r > 0x10FFFF || isRuneInTables(r, nonprint, combining, notassigned):
 		return 0
-	case (EastAsianWidth && IsAmbiguousRuneWidth(r)) || inTables(r, doublewidth, emoji):
+	case (EastAsianWidth && IsAmbiguousRuneWidth(r)) || isRuneInTables(r, doublewidth, emoji):
 		return 2
 	default:
 		return 1
@@ -31,7 +31,7 @@ func RuneStringWidth(s string) (width int) {
 			continue
 		}
 		w := RuneWidth(r)
-		if r2 == 0x200D && inTables(r, emoji) && inTables(r1, emoji) {
+		if r2 == 0x200D && isRuneInTables(r, emoji) && isRuneInTables(r1, emoji) {
 			w = 0
 		}
 		width += w
@@ -113,12 +113,12 @@ func RuneFillRight(s string, w int) string {
 
 // IsAmbiguousWidth returns whether is ambiguous width or not.
 func IsAmbiguousRuneWidth(r rune) bool {
-	return inTables(r, private, ambiguous)
+	return isRuneInTables(r, private, ambiguous)
 }
 
 // IsNeutralWidth returns whether is neutral width or not.
 func IsNeutralRuneWidth(r rune) bool {
-	return inTable(r, neutral)
+	return isRuneInTable(r, neutral)
 }
 
 type interval struct {
@@ -932,17 +932,16 @@ func IsEastAsianLocale() bool {
 	return false
 }
 
-func inTables(r rune, ts ...table) bool {
+func isRuneInTables(r rune, ts ...table) bool {
 	for _, t := range ts {
-		if inTable(r, t) {
+		if isRuneInTable(r, t) {
 			return true
 		}
 	}
 	return false
 }
 
-func inTable(r rune, t table) bool {
-	// func (t table) IncludesRune(r rune) bool {
+func isRuneInTable(r rune, t table) bool {
 	if r < t[0].first {
 		return false
 	}

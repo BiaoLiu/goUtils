@@ -3,14 +3,12 @@ package goUtils
 import (
 	"fmt"
 	"github.com/kr/pretty"
-	"runtime"
 	"testing"
 )
 
 func TestFormatCond(t *testing.T) {
-	pc, _, _, _ := runtime.Caller(0)
-	f := runtime.FuncForPC(pc)
-	fmt.Printf("\n\n\n------%s--------\n", f.Name())
+	testStart()
+
 	delim := "and"
 	cond := make(map[string]interface{})
 	cond["id:in"] = "444,666,888"
@@ -29,4 +27,5 @@ func TestFormatCond(t *testing.T) {
 	*/
 	fmt.Printf("sqlCond %# v\n", pretty.Formatter(sqlCond))
 	fmt.Printf("param %# v\n", pretty.Formatter(param))
+	testEnd()
 }

@@ -1,3 +1,4 @@
+// 各种类型之间转来转去
 // @author      Liu Yongshuai<liuyongshuai@hotmail.com>
 // @date        2018-11-22 18:27
 
@@ -32,6 +33,7 @@ const (
 	UintKind
 	PtrKind
 	ContainerKind
+	FuncKind
 )
 
 var (
@@ -65,6 +67,8 @@ func GetBasicKind(v reflect.Value) (Basickind, error) {
 		return PtrKind, nil
 	case reflect.Struct, reflect.Map, reflect.Slice, reflect.Array:
 		return ContainerKind, nil
+	case reflect.Func:
+		return FuncKind, nil
 	}
 	return InvalidKind, ErrorInvalidInputType
 }
@@ -137,6 +141,7 @@ func TryBestToInt64(value interface{}) (int64, error) {
 
 //从左边开始提取数据及小数点
 func getFloatStrFromLeft(val string) string {
+	val = strings.TrimSpace(val)
 	valBytes := StrToByte(val)
 	buf := bytes.Buffer{}
 	for _, b := range valBytes {
@@ -232,7 +237,7 @@ func tryBestConvertAnyTypeToInt(value interface{}, isUnsigned bool) (interface{}
 	}
 }
 
-//转换为字符串
+//尽最大努力转换为字符串
 func TryBestToString(value interface{}) (string, error) {
 	val := reflect.ValueOf(value)
 	basicKind, err := GetBasicKind(val)
@@ -266,7 +271,7 @@ func TryBestToString(value interface{}) (string, error) {
 	}
 }
 
-//转换为float64
+//尽最大努力转换为float64
 func TryBestToFloat(value interface{}) (float64, error) {
 	val := reflect.ValueOf(value)
 	basicKind, err := GetBasicKind(val)
@@ -328,6 +333,8 @@ func TryBestToBool(value interface{}) (bool, error) {
 			return false, nil
 		}
 		return TryBestToBool(val.Elem().Interface())
+	case FuncKind:
+		return !val.IsNil(), nil
 	}
 
 	//对于Array, Chan, Map, Slice长度>0即可

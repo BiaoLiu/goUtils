@@ -7,7 +7,6 @@ package goUtils
 import (
 	"fmt"
 	"os"
-	"runtime"
 	"testing"
 )
 
@@ -37,9 +36,7 @@ var (
 )
 
 func TestGeoLine(t *testing.T) {
-	pc, _, _, _ := runtime.Caller(0)
-	f := runtime.FuncForPC(pc)
-	fmt.Printf("\n\n\n------------start %s------------\n", f.Name())
+	testStart()
 
 	//各边的夹角
 	fmt.Printf("rightLine_bottomLine angle: %v\n", testRightLine.AngleWithLine(testBottomLine))
@@ -74,7 +71,7 @@ func TestGeoLine(t *testing.T) {
 	//对角线交点
 	fmt.Println(interPoint.IsBelow(testLeftTopRightBottom))
 	fmt.Println(testWestSouthPoint.IsBelow(testLeftTopRightBottom))
-	fmt.Printf("------------end %s------------\n", f.Name())
+	testEnd()
 }
 
 var (
@@ -99,9 +96,7 @@ var (
 
 //两线段共线的测试
 func TestGeoLine_GetIntersectPoints(t *testing.T) {
-	pc, _, _, _ := runtime.Caller(0)
-	f := runtime.FuncForPC(pc)
-	fmt.Printf("\n\n\n------------start %s------------\n", f.Name())
+	testStart()
 	interP12, isParallel := testIntersectPointsLine1.GetIntersectPoints(testIntersectPointsLine2)
 	fmt.Fprintf(os.Stdout, "line1 line2（平行但不相交） \t：=>\t%v %v\n", interP12, isParallel)
 	interP23, isParallel := testIntersectPointsLine2.GetIntersectPoints(testIntersectPointsLine3)
@@ -116,5 +111,5 @@ func TestGeoLine_GetIntersectPoints(t *testing.T) {
 	fmt.Fprintf(os.Stdout, "line7 line8（不平行，有一个交点） \t：=>\t%v %v\n", interP78, isParallel)
 	interP71, isParallel := testIntersectPointsLine7.GetIntersectPoints(testIntersectPointsLine1)
 	fmt.Fprintf(os.Stdout, "line7 line1（不平行，有一个交点，且交点在端点） \t：=>\t%v %v\n", interP71, isParallel)
-	fmt.Printf("------------end %s------------\n", f.Name())
+	testEnd()
 }

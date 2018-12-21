@@ -17,40 +17,55 @@ import (
 )
 
 func TestToCBD(t *testing.T) {
-	pc, _, _, _ := runtime.Caller(0)
-	f := runtime.FuncForPC(pc)
-	fmt.Printf("\n\n\n------------start %s------------\n", f.Name())
+	testStart()
 	str := "ａｂｃａ@￥@#%#ｓｄ🎈🎉ｆ我E２３４３４５んエォサ６３＃＄％＾＄＆％＾（＆我"
 	fmt.Println(str)
 	fmt.Println(ToCBD(str))
-	fmt.Printf("------------end %s------------\n", f.Name())
+	testEnd()
 }
 
 func TestToDBC(t *testing.T) {
-	pc, _, _, _ := runtime.Caller(0)
-	f := runtime.FuncForPC(pc)
-	fmt.Printf("\n\n\n------------start %s------------\n", f.Name())
+	testStart()
 	str := "んエォサ６３1234567sdgs sdfgsａｂ。......ｃａ@￥@#%#ｓｄ我"
 	fmt.Println(str)
 	fmt.Println(ToDBC(str))
-	fmt.Printf("------------end %s------------\n", f.Name())
+	testEnd()
 }
 
 func TestLocalIP(t *testing.T) {
-	pc, _, _, _ := runtime.Caller(0)
-	f := runtime.FuncForPC(pc)
-	fmt.Printf("\n\n\n------------start %s------------\n", f.Name())
+	testStart()
 	localIps := LocalIP()
 	for _, ip := range localIps {
 		fmt.Fprintf(os.Stdout, "localIP[%s] IsPrivate[%v]\n", ip, IsPrivateIP(ip))
 	}
 	user1, _ := user.Current()
 	fmt.Println(user1.HomeDir)
-	fmt.Printf("------------end %s------------\n", f.Name())
+	testEnd()
 }
 
 func TestPrintCallerName(t *testing.T) {
+	testStart()
 	PrintCallerName(0, "TestPrintCallerName")
+	testEnd()
+}
+
+func TestGenNextId(t *testing.T) {
+	testStart()
+	var genId int64
+	var err error
+	for i := 0; i < 20; i++ {
+		genId, err = SequenceIDGenerator.NextId()
+		fmt.Println(genId, err)
+	}
+	testEnd()
+}
+
+func TestFakeTraceId(t *testing.T) {
+	testStart()
+	for i := 0; i < 50; i++ {
+		fmt.Println(FakeTraceId())
+	}
+	testEnd()
 }
 
 // 获取调用者信息
@@ -93,43 +108,50 @@ func PrintCallerName(skip int, comment string) (string, bool) {
 }
 
 func TestIsNormalStr(t *testing.T) {
-	pc, _, _, _ := runtime.Caller(0)
-	f := runtime.FuncForPC(pc)
-	fmt.Printf("\n\n\n------------start %s------------\n", f.Name())
+	testStart()
 	fmt.Println(IsNormalStr("ssss我&"))
 	fmt.Println(IsNormalStr("馄饨面+wendao"))
 	fmt.Println(IsNormalStr("面条1碗"))
-	fmt.Printf("------------end %s------------\n", f.Name())
+	testEnd()
 }
 
 func TestRandFloat64(t *testing.T) {
+	testStart()
 	min, max := 39.67068, 41.060816
-	for i := 0; i < 10000000; i++ {
+	for i := 0; i < 100; i++ {
 		ret := RandFloat64InRange(min, max)
 		if ret <= min || ret >= max {
 			t.Errorf("Random number out of range : %f", ret)
 		}
 		//fmt.Printf("%f\n", ret)
 	}
+	testEnd()
 }
 
 func TestStrHashSum64(t *testing.T) {
+	testStart()
 	s := "asdfasdfasdfasdf"
 	fmt.Println(int64(StrHashSum64(s)))
+	testEnd()
 }
 
 func TestRandomStr(t *testing.T) {
+	testStart()
 	fmt.Println(RandomStr(15))
 	fmt.Println(RandomStr(32))
+	testEnd()
 }
 func TestBase62(t *testing.T) {
+	testStart()
 	var i int64 = 349879
 	b62 := Base62Encode(i)
 	fmt.Println(b62)
 	fmt.Println(Base62Decode(b62))
+	testEnd()
 }
 
 func TestPregReplaceCallback(t *testing.T) {
+	testStart()
 	originStr := `
 <div class="dropdown global-dropdown">
 	<button class="global-dropdown-toggle" data-toggle="dropdown" type="button">
@@ -198,16 +220,22 @@ func TestPregReplaceCallback(t *testing.T) {
 		return ms[0]
 	})
 	fmt.Println("修改了i标签的属性", ss)
+	testEnd()
 }
 
 func TestOpenNewFile(t *testing.T) {
-	f := "/Users/liuyongshuai/Documents/wendao/liu/sss/asdfasdfdsaf/abc.txt"
-	fp, err := OpenNewFile(f, "", true)
+	testStart()
+
+	ff := "/Users/liuyongshuai/Documents/wendao/liu/sss/asdfasdfdsaf/abc.txt"
+	fp, err := OpenNewFile(ff, "", true)
 	fmt.Println(err)
 	fp.Close()
+	testEnd()
 }
 
 func TestTryBestConvert(t *testing.T) {
+	testStart()
+
 	p1 := 45649065094658405684504232323223322334.555
 	p2 := "45s89s"
 	p3 := "wendao"
@@ -240,9 +268,12 @@ func TestTryBestConvert(t *testing.T) {
 			pretty.Formatter(boolVal), boolErr,
 		)
 	}
+	testEnd()
 }
 
 func TestFilterIds(t *testing.T) {
+	testStart()
+
 	ids := []interface{}{
 		3434,
 		-9999,
@@ -250,9 +281,12 @@ func TestFilterIds(t *testing.T) {
 	}
 	ret := FilterIds(ids)
 	fmt.Println(ret)
+	testEnd()
 }
 
 func TestPrintTextDiff(t *testing.T) {
+	testStart()
+
 	text1 := `
 45454545454545454  特朗普谈美国向移民发射催泪弹：移民很粗暴
 sadfadsad 安徽：助力民企发展壮大 支持民营企业在行动
@@ -270,9 +304,12 @@ sss 湖南隆回暂缓"百元车位" 中标单位曾被指可获暴利
 ||||||||||\、、、、、、暴风雪袭击美国芝加哥地区 近900个航班被取消
 `
 	PrintTextDiff(text1, text2)
+	testEnd()
 }
 
 func TestPrintDiffTextByGroup(t *testing.T) {
+	testStart()
+
 	leftText := [][]string{
 		{
 			"45454545454545454  特朗普谈美国向移民发射催泪弹：移民很粗暴",
@@ -312,15 +349,86 @@ func TestPrintDiffTextByGroup(t *testing.T) {
 	PrintTextDiffByGroup(leftText, rightText)
 	PrintTextDiffByGroup(leftText, [][]string{})
 	PrintTextDiffByGroup([][]string{}, rightText)
+	testEnd()
 }
 
 func TestWrap(t *testing.T) {
+	testStart()
+
 	str := "暴风雪袭击美国芝加哥地区"
 	fmt.Println(RuneWrap(str, 7))
 	/**
-暴风雪
-袭击美
-国芝加
-哥地区
-	 */
+	暴风雪
+	袭击美
+	国芝加
+	哥地区
+	*/
+	testEnd()
+}
+
+func TestMapKeys(t *testing.T) {
+	testStart()
+
+	m := map[interface{}]interface{}{
+		"wendao":                                444444,
+		333:                                     0.4444,
+		GeoPoint{Lat: 30.33333, Lng: 120.44444}: "aaaaa",
+	}
+	m2 := map[interface{}]interface{}{
+		"wendao":                                444444,
+		333:                                     0.4444,
+		GeoPoint{Lat: 30.33333, Lng: 120.44444}: "aaaaa",
+	}
+	ks := MapKeys(m)
+	fmt.Println(ks)
+	vs := MapValues(m)
+	fmt.Println(vs)
+	fmt.Println(MapIsSet(m, "aaa"))
+	fmt.Println(MapIsEmpty(m))
+	fmt.Println(MapMerge(m, m2))
+	testEnd()
+}
+
+func TestParseStr(t *testing.T) {
+	testStart()
+	str := "first=value&arr[]=foo+bar&arr[]=baz"
+	ret := ParseStr(str)
+	fmt.Printf("%# v\n", pretty.Formatter(ret))
+	testEnd()
+}
+
+func TestSubstr(t *testing.T) {
+	testStart()
+	str := "first=value&arr[]=foo+bar&arr[]=baz"
+	fmt.Println(Substr(str, 0, len(str)))
+	testEnd()
+}
+
+func TestStrShuffle(t *testing.T) {
+	testStart()
+	str := "first=value&arr[]=foo+bar&arr[]=baz"
+	fmt.Println(str, StrShuffle(str))
+	testEnd()
+}
+
+func TestGetTerminalSize(t *testing.T) {
+	w, h, e := GetTerminalSize()
+	fmt.Println(w, h, e)
+	s := strings.Repeat("=", w-1)
+	fmt.Println(s)
+}
+
+func TestToSliceIface(t *testing.T) {
+	testStart()
+	a := []string{"wendao", "detach"}
+	fmt.Println(ToSliceIface(a))
+	testEnd()
+}
+
+func TestByteToStr(t *testing.T) {
+	testStart()
+	var bt []byte
+	a := ByteToStr(bt)
+	fmt.Printf("%# v\n", pretty.Formatter(a))
+	testEnd()
 }
