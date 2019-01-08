@@ -59,7 +59,7 @@ func (tb *TplBuilder) initTplBuilder() error {
 	if len(tb.TplNameMap) <= 0 {
 		return fmt.Errorf("connt find tpl files")
 	}
-	for k, fn := range commonTplFuncs {
+	for k, fn := range CommonTplFuncs {
 		tb.TplFuncMap[k] = fn
 	}
 	tb.isHaveInit = true

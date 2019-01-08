@@ -12,7 +12,7 @@ import (
 )
 
 //常用的模板函数
-var commonTplFuncs = map[string]interface{}{
+var CommonTplFuncs = map[string]interface{}{
 	"substr":                  Substr,
 	"htmlspecialchars":        TplFuncHtmlSpecialChars,
 	"htmlspecialchars_decode": TplFuncHtmlSpecialcharsDecode,
