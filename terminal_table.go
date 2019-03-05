@@ -281,6 +281,10 @@ func (t *TerminalTable) renderSingleRow(row *terminalTableRow) string {
 	return buf.String()
 }
 
+var (
+	splitReg, _ = regexp.Compile(`\n`)
+)
+
 //将一行数据折行，并返回最大行数，主要策略是每次都将最长的行折半，一直折到所有行的长度小于屏幕长度
 func wrapTableRows(rawRow []string) (retRow *terminalTableRow) {
 	if len(rawRow) <= 0 {
@@ -289,7 +293,6 @@ func wrapTableRows(rawRow []string) (retRow *terminalTableRow) {
 	retRow = &terminalTableRow{columnWidth: make([]int, len(rawRow))}
 	//每一行中都有一些多余的字符，要将屏幕宽度减去这部分
 	totalWidth := ScreenWidth - len(rawRow)*5
-	reg, _ := regexp.Compile(`\n`)
 	allWidth := 0
 
 	cellNoMap := make(map[int]*terminalTableCell)
@@ -297,9 +300,10 @@ func wrapTableRows(rawRow []string) (retRow *terminalTableRow) {
 
 	//统计各小格子宽度
 	for idx, row := range rawRow {
+		rawRow[idx] = replaceRowStr(row)
 		//本小格子的最大宽度，要考虑小格子的数据中有换行符的情况
 		maxw := 0
-		tmp := reg.Split(row, -1)
+		tmp := splitReg.Split(row, -1)
 		for _, t := range tmp {
 			w := RuneStringWidth(t)
 			if w > maxw {
@@ -349,8 +353,9 @@ func wrapTableRows(rawRow []string) (retRow *terminalTableRow) {
 		if lineNum > maxLineNum {
 			maxLineNum = lineNum
 		}
-		tmp := reg.Split(tmpCellStr, -1)
+		tmp := splitReg.Split(tmpCellStr, -1)
 		for _, t := range tmp {
+			t = strings.Trim(t, "\n")
 			cellUnit.cellStrList = append(cellUnit.cellStrList, " "+t+" ")
 		}
 	}
@@ -374,4 +379,17 @@ func wrapTableRows(rawRow []string) (retRow *terminalTableRow) {
 	}
 
 	return retRow
+}
+
+var (
+	replaceList = strings.NewReplacer(
+		"“", "\"",
+		"”", "\"",
+		"\t","    ",
+	)
+)
+
+//替换掉会影响行长度计算的字符
+func replaceRowStr(s string) string {
+	return replaceList.Replace(s)
 }
