@@ -227,7 +227,7 @@ func (t *TerminalTable) prepareSomething() {
 
 //计算各列的最大长度
 func (t *TerminalTable) getMaxColumnWidths() {
-	t.allTableAllowWidth = ScreenWidth - t.maxColumnNum*6
+	t.allTableAllowWidth = ScreenWidth - t.maxColumnNum*4
 	t.maxColumnWidth = make([]int, t.maxColumnNum)
 	for idx, row := range t.rawHeaderData {
 		t.maxColumnWidth[idx] = RuneStringWidth(row)
