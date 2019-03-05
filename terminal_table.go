@@ -13,31 +13,48 @@ import (
 )
 
 type TerminalTable struct {
-	rawHeaderData       []string            //原始的表头数据
-	headerFontColorFunc ColorFunc           //表头的字体颜色，默认Yellow
-	rawRowData          [][]string          //原始的行的数据
-	rowFontColorFunc    ColorFunc           //表格内容的字体颜色
-	borderColorFunc     ColorFunc           //边框的颜色
-	isUseSeparator      bool                //是否需要每行间的分隔线
-	maxColumnNum        int                 //列的数量，以最多的一行的列为准
-	maxColumnWidth      []int               //每列的最大宽度，对齐用的
-	rowData             []*terminalTableRow //所有行
-	allTableAllowWidth  int                 //表格允许的最大宽度
+	//表格的原始数据，目前只有表头和行内容
+	rawHeaderData []string   //原始的表头数据
+	rawRowData    [][]string //原始的行的数据
+
+	//控制字体颜色
+	headerFontColorFunc ColorFunc //表头的字体颜色，默认Yellow
+	rowFontColorFunc    ColorFunc //表格内容的字体颜色
+	borderColorFunc     ColorFunc //边框的颜色
+
+	//控制边框的显示
+	isNeedVerticalLine   bool //是否需要表格中间的坚线
+	isNeedHorizontalLine bool //是否需要表格的横线
+
+	//以下是根据添加的数据自动生成的
+	maxColumnNum   int                 //列的数量，以最多的一行的列为准
+	maxColumnWidth []int               //每列的最大宽度，对齐用的
+	rowData        []*terminalTableRow //所有行
+
+	//是根据表格的列数、屏幕的宽度来自动生成的
+	allTableAllowWidth int //表格允许的最大宽度
 }
 
 func NewTerminalTable() *TerminalTable {
 	t := &TerminalTable{
-		isUseSeparator:      true,
-		headerFontColorFunc: Yellow,
-		rowFontColorFunc:    nil,
-		borderColorFunc:     nil,
+		isNeedVerticalLine:   true,
+		isNeedHorizontalLine: true,
+		headerFontColorFunc:  Yellow,
+		rowFontColorFunc:     nil,
+		borderColorFunc:      nil,
 	}
 	return t
 }
 
-//是否使用行的分隔符
-func (t *TerminalTable) IsUseRowSeparator(b bool) *TerminalTable {
-	t.isUseSeparator = b
+//是否需要表格的坚直分隔线
+func (t *TerminalTable) IsNeedVerticalBorderLine(b bool) *TerminalTable {
+	t.isNeedVerticalLine = b
+	return t
+}
+
+//是否需要表格的水平分隔线
+func (t *TerminalTable) IsNeedHorizontalBorderLine(b bool) *TerminalTable {
+	t.isNeedHorizontalLine = b
 	return t
 }
 
@@ -110,18 +127,23 @@ func (t *TerminalTable) Render() string {
 
 	//行分隔符，根据每列的最大列宽来决定
 	sepBuf := bytes.Buffer{}
-	sepBuf.WriteString(t.borderStr("+"))
+	joinStr := "-"
+	if t.isNeedVerticalLine {
+		joinStr = "+"
+	}
+	joinStr = t.borderStr(joinStr)
+	sepBuf.WriteString(joinStr)
 	for _, w := range t.maxColumnWidth {
 		sepBuf.WriteString(t.borderStr(strings.Repeat("-", w)))
-		sepBuf.WriteString(t.borderStr("+"))
+		sepBuf.WriteString(joinStr)
 	}
-	separatorLine := sepBuf.String()
+	horizontalLine := sepBuf.String()
 
 	dataBuf := bytes.Buffer{}
 
 	//第一个行分隔符，先写进去
-	if t.isUseSeparator {
-		dataBuf.WriteString(separatorLine)
+	if t.isNeedHorizontalLine {
+		dataBuf.WriteString(horizontalLine)
 		dataBuf.WriteString("\n")
 	}
 
@@ -132,8 +154,8 @@ func (t *TerminalTable) Render() string {
 			continue
 		}
 		dataBuf.WriteString(rowStr)
-		if t.isUseSeparator {
-			dataBuf.WriteString(separatorLine)
+		if t.isNeedHorizontalLine {
+			dataBuf.WriteString(horizontalLine)
 			dataBuf.WriteString("\n")
 		}
 	}
@@ -305,9 +327,9 @@ func (t *TerminalTable) renderSingleRow(row *terminalTableRow) string {
 	}
 	buf := bytes.Buffer{}
 	//竖线分隔符
-	verSepLine := t.borderStr("|")
-	if !t.isUseSeparator {
-		verSepLine = " "
+	verSepLine := " "
+	if t.isNeedVerticalLine {
+		verSepLine = t.borderStr("|")
 	}
 	//列的数量
 	colNum := len(row.cellList)
