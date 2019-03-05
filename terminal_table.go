@@ -22,6 +22,7 @@ type TerminalTable struct {
 	maxColumnNum        int                 //列的数量，以最多的一行的列为准
 	maxColumnWidth      []int               //每列的最大宽度，对齐用的
 	rowData             []*terminalTableRow //所有行
+	allTableAllowWidth  int                 //表格允许的最大宽度
 }
 
 func NewTerminalTable() *TerminalTable {
@@ -149,25 +150,34 @@ const (
 
 //一行数据，包含多个列
 type terminalTableRow struct {
-	lineNum     int     //本行各个小格子的数据行数，本行所有列的行数都是一样的
-	columnWidth []int   //本行数据各列的宽度
-	rowType     rowType //本行数据的类型，是表头还是数据内容
-	cellList    []*terminalTableCell
+	lineNum  int     //本行各个小格子的数据行数，本行所有列的行数都是一样的
+	rowType  rowType //本行数据的类型，是表头还是数据内容
+	cellList []*terminalTableCell
 }
 
 //一个小格子里的数据
 type terminalTableCell struct {
-	columnNo      int      //第几列
-	maxAllowWidth int      //允许的最大宽度
-	cellStrList   []string //本小格子的数据，可能要分多行
+	columnNo    int      //第几列
+	maxWidth    int      //宽度
+	cellStrList []string //本小格子的数据，可能要分多行
 }
+
+var (
+	splitReg, _ = regexp.Compile(`\n`)
+	replaceList = strings.NewReplacer(
+		"“", "\"",
+		"”", "\"",
+		"\t", "    ",
+	)
+)
 
 //计算属性
 func (t *TerminalTable) prepareSomething() {
 	if len(t.rawHeaderData) <= 0 && len(t.rawRowData) <= 0 {
 		return
 	}
-	t.maxColumnWidth = make([]int, t.maxColumnNum)
+	//每一行中都有一些多余的字符，要将屏幕宽度减去这部分
+	t.getMaxColumnWidths()
 	headerLen := len(t.rawHeaderData)
 
 	//把所有的行的列数补齐到一致，方便输出
@@ -188,26 +198,17 @@ func (t *TerminalTable) prepareSomething() {
 
 	//统一给各行折一下行
 	if headerLen > 0 {
-		tmp := wrapTableRows(t.rawHeaderData)
+		tmp := t.wrapTableRows(t.rawHeaderData)
 		if tmp != nil {
 			tmp.rowType = rowTypeHeader
 			t.rowData = append(t.rowData, tmp)
 		}
 	}
 	for idx := range t.rawRowData {
-		tmp := wrapTableRows(t.rawRowData[idx])
+		tmp := t.wrapTableRows(t.rawRowData[idx])
 		if tmp != nil {
 			tmp.rowType = rowTypeData
 			t.rowData = append(t.rowData, tmp)
-		}
-	}
-	//再统计各列的最大宽度，并给各列补齐到相同的宽度
-	for idx := range t.rowData {
-		row := t.rowData[idx]
-		for i, w := range row.columnWidth {
-			if t.maxColumnWidth[i] < w {
-				t.maxColumnWidth[i] = w
-			}
 		}
 	}
 
@@ -221,6 +222,54 @@ func (t *TerminalTable) prepareSomething() {
 				cellUnit.cellStrList[subCellIdx] = subCellStr
 			}
 		}
+	}
+}
+
+//计算各列的最大长度
+func (t *TerminalTable) getMaxColumnWidths() {
+	t.allTableAllowWidth = ScreenWidth - t.maxColumnNum*6
+	t.maxColumnWidth = make([]int, t.maxColumnNum)
+	for idx, row := range t.rawHeaderData {
+		t.maxColumnWidth[idx] = RuneStringWidth(row)
+	}
+	for _, rows := range t.rawRowData {
+		for idx, row := range rows {
+			l := RuneStringWidth(row)
+			if l > t.maxColumnWidth[idx] {
+				t.maxColumnWidth[idx] = l
+			}
+		}
+	}
+
+	//再次校验一下总长度
+	allWidth := int(0)
+	var maxColWidthList []*terminalTableCell
+	for idx, w := range t.maxColumnWidth {
+		allWidth += w
+		maxColWidthList = append(maxColWidthList, &terminalTableCell{columnNo: idx, maxWidth: w})
+	}
+
+	//如果各小格子的宽度和大于屏幕宽度
+	if allWidth > t.allTableAllowWidth {
+		for {
+			diff := allWidth - t.allTableAllowWidth
+			sort.Slice(maxColWidthList, func(i, j int) bool {
+				return maxColWidthList[i].maxWidth > maxColWidthList[j].maxWidth
+			})
+			//本次总宽度消除量
+			reduce := maxColWidthList[0].maxWidth / 3
+			if reduce > diff {
+				reduce = diff
+			}
+			maxColWidthList[0].maxWidth -= reduce
+			allWidth -= reduce
+			if allWidth <= t.allTableAllowWidth {
+				break
+			}
+		}
+	}
+	for _, colW := range maxColWidthList {
+		t.maxColumnWidth[colW.columnNo] = colW.maxWidth + 2
 	}
 }
 
@@ -260,7 +309,7 @@ func (t *TerminalTable) renderSingleRow(row *terminalTableRow) string {
 		verSepLine = " "
 	}
 	//列的数量
-	colNum := len(row.columnWidth)
+	colNum := len(row.cellList)
 	//小格子里的内容被拆分成了多少行，所有小格子的行都是一样的
 	srowNum := len(row.cellList[0].cellStrList)
 	for i := 0; i < srowNum; i++ {
@@ -281,62 +330,22 @@ func (t *TerminalTable) renderSingleRow(row *terminalTableRow) string {
 	return buf.String()
 }
 
-var (
-	splitReg, _ = regexp.Compile(`\n`)
-)
-
 //将一行数据折行，并返回最大行数，主要策略是每次都将最长的行折半，一直折到所有行的长度小于屏幕长度
-func wrapTableRows(rawRow []string) (retRow *terminalTableRow) {
+func (t *TerminalTable) wrapTableRows(rawRow []string) (retRow *terminalTableRow) {
 	if len(rawRow) <= 0 {
 		return nil
 	}
-	retRow = &terminalTableRow{columnWidth: make([]int, len(rawRow))}
-	//每一行中都有一些多余的字符，要将屏幕宽度减去这部分
-	totalWidth := ScreenWidth - len(rawRow)*5
-	allWidth := 0
-
+	retRow = &terminalTableRow{}
 	cellNoMap := make(map[int]*terminalTableCell)
-	var tmpCellList []*terminalTableCell
 
 	//统计各小格子宽度
 	for idx, row := range rawRow {
-		rawRow[idx] = replaceRowStr(row)
-		//本小格子的最大宽度，要考虑小格子的数据中有换行符的情况
-		maxw := 0
-		tmp := splitReg.Split(row, -1)
-		for _, t := range tmp {
-			w := RuneStringWidth(t)
-			if w > maxw {
-				maxw = w
-			}
-		}
-		allWidth += maxw
+		rawRow[idx] = replaceList.Replace(row)
 		cell := &terminalTableCell{
-			columnNo:      idx,
-			maxAllowWidth: maxw,
+			columnNo: idx,
+			maxWidth: t.maxColumnWidth[idx],
 		}
-		tmpCellList = append(tmpCellList, cell)
 		cellNoMap[idx] = cell
-	}
-
-	//如果各小格子的宽度和大于屏幕宽度
-	if allWidth > totalWidth {
-		for {
-			diff := allWidth - totalWidth
-			sort.Slice(tmpCellList, func(i, j int) bool {
-				return tmpCellList[i].maxAllowWidth > tmpCellList[j].maxAllowWidth
-			})
-			//本次总宽度消除量
-			reduce := tmpCellList[0].maxAllowWidth / 2
-			if reduce > diff {
-				reduce = diff
-			}
-			tmpCellList[0].maxAllowWidth -= reduce
-			allWidth -= reduce
-			if allWidth <= totalWidth {
-				break
-			}
-		}
 	}
 
 	//各小格子的最大行数
@@ -345,15 +354,15 @@ func wrapTableRows(rawRow []string) (retRow *terminalTableRow) {
 	//开始对各小格子进行拆行处理
 	for idx, cellStr := range rawRow {
 		cellUnit := cellNoMap[idx]
-		tmpCellStr := cellStr
+		cellWidth := cellUnit.maxWidth - 2
 		lineNum := 1
-		if RuneStringWidth(cellStr) > cellUnit.maxAllowWidth {
-			tmpCellStr, lineNum = RuneWrap(cellStr, cellUnit.maxAllowWidth)
+		if RuneStringWidth(cellStr) > cellWidth {
+			cellStr, lineNum = RuneWrap(cellStr, cellWidth)
 		}
 		if lineNum > maxLineNum {
 			maxLineNum = lineNum
 		}
-		tmp := splitReg.Split(tmpCellStr, -1)
+		tmp := splitReg.Split(cellStr, -1)
 		for _, t := range tmp {
 			t = strings.Trim(t, "\n")
 			cellUnit.cellStrList = append(cellUnit.cellStrList, " "+t+" ")
@@ -367,29 +376,8 @@ func wrapTableRows(rawRow []string) (retRow *terminalTableRow) {
 		for i := 0; i < maxLineNum-tmpLen; i++ {
 			cellUnit.cellStrList = append(cellUnit.cellStrList, " ")
 		}
-		maxCellWidth := 0
-		for _, s := range cellUnit.cellStrList {
-			l := RuneStringWidth(s)
-			if l > maxCellWidth {
-				maxCellWidth = l
-			}
-		}
 		retRow.cellList = append(retRow.cellList, cellUnit)
-		retRow.columnWidth[idx] = maxCellWidth
 	}
 
 	return retRow
-}
-
-var (
-	replaceList = strings.NewReplacer(
-		"“", "\"",
-		"”", "\"",
-		"\t","    ",
-	)
-)
-
-//替换掉会影响行长度计算的字符
-func replaceRowStr(s string) string {
-	return replaceList.Replace(s)
 }
