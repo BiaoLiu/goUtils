@@ -12,6 +12,15 @@ import (
 	"strings"
 )
 
+func NewTerminalTable() *TerminalTable {
+	t := &TerminalTable{
+		headerFontColorFunc: Yellow,
+		rowFontColorFunc:    nil,
+		borderColorFunc:     nil,
+	}
+	return t
+}
+
 type TerminalTable struct {
 	//表格的原始数据，目前只有表头和行内容
 	rawHeaderData []string   //原始的表头数据
@@ -22,10 +31,6 @@ type TerminalTable struct {
 	rowFontColorFunc    ColorFunc //表格内容的字体颜色
 	borderColorFunc     ColorFunc //边框的颜色
 
-	//控制边框的显示
-	isNeedVerticalLine   bool //是否需要表格中间的坚线
-	isNeedHorizontalLine bool //是否需要表格的横线
-
 	//以下是根据添加的数据自动生成的
 	maxColumnNum   int                 //列的数量，以最多的一行的列为准
 	maxColumnWidth []int               //每列的最大宽度，对齐用的
@@ -33,29 +38,6 @@ type TerminalTable struct {
 
 	//是根据表格的列数、屏幕的宽度来自动生成的
 	allTableAllowWidth int //表格允许的最大宽度
-}
-
-func NewTerminalTable() *TerminalTable {
-	t := &TerminalTable{
-		isNeedVerticalLine:   true,
-		isNeedHorizontalLine: true,
-		headerFontColorFunc:  Yellow,
-		rowFontColorFunc:     nil,
-		borderColorFunc:      nil,
-	}
-	return t
-}
-
-//是否需要表格的坚直分隔线
-func (t *TerminalTable) IsNeedVerticalBorderLine(b bool) *TerminalTable {
-	t.isNeedVerticalLine = b
-	return t
-}
-
-//是否需要表格的水平分隔线
-func (t *TerminalTable) IsNeedHorizontalBorderLine(b bool) *TerminalTable {
-	t.isNeedHorizontalLine = b
-	return t
 }
 
 //添加表头数据
@@ -127,11 +109,7 @@ func (t *TerminalTable) Render() string {
 
 	//行分隔符，根据每列的最大列宽来决定
 	sepBuf := bytes.Buffer{}
-	joinStr := "-"
-	if t.isNeedVerticalLine {
-		joinStr = "+"
-	}
-	joinStr = t.borderStr(joinStr)
+	joinStr := t.borderStr("+")
 	sepBuf.WriteString(joinStr)
 	for _, w := range t.maxColumnWidth {
 		sepBuf.WriteString(t.borderStr(strings.Repeat("-", w)))
@@ -142,11 +120,8 @@ func (t *TerminalTable) Render() string {
 	dataBuf := bytes.Buffer{}
 
 	//第一个行分隔符，先写进去
-	if t.isNeedHorizontalLine {
-		dataBuf.WriteString(horizontalLine)
-		dataBuf.WriteString("\n")
-	}
-
+	dataBuf.WriteString(horizontalLine)
+	dataBuf.WriteString("\n")
 	for idx := range t.rowData {
 		row := t.rowData[idx]
 		rowStr := t.renderSingleRow(row)
@@ -154,10 +129,8 @@ func (t *TerminalTable) Render() string {
 			continue
 		}
 		dataBuf.WriteString(rowStr)
-		if t.isNeedHorizontalLine {
-			dataBuf.WriteString(horizontalLine)
-			dataBuf.WriteString("\n")
-		}
+		dataBuf.WriteString(horizontalLine)
+		dataBuf.WriteString("\n")
 	}
 
 	return dataBuf.String()
@@ -252,6 +225,8 @@ func (t *TerminalTable) prepareSomething() {
 func (t *TerminalTable) getMaxColumnWidths() {
 	t.allTableAllowWidth = ScreenWidth - t.maxColumnNum*4
 	t.maxColumnWidth = make([]int, t.maxColumnNum)
+
+	//算上表头，计算各列宽度最大值
 	for idx, row := range t.rawHeaderData {
 		t.maxColumnWidth[idx] = RuneStringWidth(row)
 	}
@@ -264,7 +239,7 @@ func (t *TerminalTable) getMaxColumnWidths() {
 		}
 	}
 
-	//再次校验一下总长度
+	//再次校验一下总宽度
 	allWidth := int(0)
 	var maxColWidthList []*terminalTableCell
 	for idx, w := range t.maxColumnWidth {
@@ -272,7 +247,7 @@ func (t *TerminalTable) getMaxColumnWidths() {
 		maxColWidthList = append(maxColWidthList, &terminalTableCell{columnNo: idx, maxWidth: w})
 	}
 
-	//如果各小格子的宽度和大于屏幕宽度
+	//如果各小格子的宽度和大于屏幕宽度，每轮循环都将最宽的列折行，一直折到适合屏幕大小为止
 	if allWidth > t.allTableAllowWidth {
 		for {
 			diff := allWidth - t.allTableAllowWidth
@@ -291,6 +266,8 @@ func (t *TerminalTable) getMaxColumnWidths() {
 			}
 		}
 	}
+
+	//重新设置各列宽度最大值
 	for _, colW := range maxColWidthList {
 		t.maxColumnWidth[colW.columnNo] = colW.maxWidth + 2
 	}
@@ -326,13 +303,13 @@ func (t *TerminalTable) renderSingleRow(row *terminalTableRow) string {
 		return ""
 	}
 	buf := bytes.Buffer{}
+
 	//竖线分隔符
-	verSepLine := " "
-	if t.isNeedVerticalLine {
-		verSepLine = t.borderStr("|")
-	}
+	verSepLine := t.borderStr("|")
+
 	//列的数量
 	colNum := len(row.cellList)
+
 	//小格子里的内容被拆分成了多少行，所有小格子的行都是一样的
 	srowNum := len(row.cellList[0].cellStrList)
 	for i := 0; i < srowNum; i++ {
@@ -347,6 +324,7 @@ func (t *TerminalTable) renderSingleRow(row *terminalTableRow) string {
 			}
 			buf.WriteString(str)
 		}
+		//最后一个分隔符
 		buf.WriteString(verSepLine)
 		buf.WriteString("\n")
 	}
