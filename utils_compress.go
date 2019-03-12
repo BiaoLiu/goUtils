@@ -1,4 +1,4 @@
-// @author      Liu Yongshuai<liuyongshuai@didichuxing.com>
+// @author      Liu Yongshuai<liuyongshuai@hotmail.com>
 // @date        2019-03-11 17:53
 
 package goUtils
