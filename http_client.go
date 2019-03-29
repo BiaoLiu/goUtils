@@ -215,7 +215,7 @@ func (ehc *HttpClient) SetContentType(ct string) *HttpClient {
 
 //设置json内容类型（设置header的相应值）
 func (ehc *HttpClient) SetContentTypeJson() *HttpClient {
-	ehc.SetHeader("Content-Type", "application/json")
+	ehc.SetHeader("Content-Type", "application/json;charset=UTF-8")
 	return ehc
 }
 
